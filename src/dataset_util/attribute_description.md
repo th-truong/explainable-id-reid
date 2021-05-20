@@ -1,4 +1,4 @@
-In the Market-1501 dataset, there are 7 attributes:
+In the Market-1501 dataset, there are 27 attributes:
 
 *Format of the list is: 
 * Attribute name **(how it appears in the file)** - the label*
