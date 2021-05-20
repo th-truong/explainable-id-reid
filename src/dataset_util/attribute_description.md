@@ -1,8 +1,8 @@
 In the Market-1501 dataset, there are 7 attributes:
 
 *Format of the list is: 
-
 * Attribute name **(how it appears in the file)** - the label*
+
 * Gender **(gender)** - male(1), female(2)
 * Hair length **(hair)** - short hair(1), long hair(2)
 * Sleeve length **(up)** - long sleeve(1), short sleeve(2)
