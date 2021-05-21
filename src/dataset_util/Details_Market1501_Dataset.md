@@ -12,8 +12,7 @@ year={2015}
 
 ## PDF:
 
-https://www.cv-foundation.org/openaccess/content_iccv_2015/papers/Zheng_Scalable_Person_Re-Identifia
-tion_ICCV_2015_paper.pdf
+https://www.cv-foundation.org/openaccess/content_iccv_2015/papers/Zheng_Scalable_Person_Re-Identifiation_ICCV_2015_paper.pdf
 
 ## ** Note Table 1 compares Market-1501 dataset to other existing dataset
 
