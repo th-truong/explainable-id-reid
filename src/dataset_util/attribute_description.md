@@ -1,7 +1,7 @@
 In the Market-1501 dataset, there are 27 attributes:
 
-*Format of the list is: 
-* *Attribute name **(how it appears in the file)** - the label*
+#### Format of the list below is: ####
+* *Attribute name **(how it appears in the file)** - the label*  
 
 * Gender **(gender)** - male(1), female(2)
 * Hair length **(hair)** - short hair(1), long hair(2)
@@ -30,3 +30,12 @@ In the Market-1501 dataset, there are 27 attributes:
 * blue lower-body clothing **(downblue)** - no(1), yes(2)
 * green lower-body clothing **(downgreen)** - no(1), yes(2)
 * brown lower-body clothing **(downbrown)** - no(1), yes(2)
+
+## Citations 
+@article{lin2019improving,
+  title={Improving Person Re-identification by Attribute and Identity Learning},
+  author={Lin, Yutian and Zheng, Liang and Zheng, Zhedong and Wu, Yu and Hu, Zhilan and Yan, Chenggang and Yang, Yi},
+  journal={Pattern Recognition},
+  doi = {https://doi.org/10.1016/j.patcog.2019.06.006},
+  year={2019}
+}
