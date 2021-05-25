@@ -4,8 +4,9 @@ import torch
 import matplotlib as plt 
 import pandas as pd 
 from scipy.io import loadmat
+from PIL import Image
 
-class MarketDataset(Dataset):
+class MarketDataset(object):
     def __init__(self, root_image_path, root_label_path):
         super().__init__()
         image_paths = []
@@ -26,3 +27,19 @@ class MarketDataset(Dataset):
         map = {}
         for attr in df2:
             map[attr] = df2[attr][0][0]
+    def __getitem__(self, idx):
+        img_path = os.path.join(self.root, "Market1501", self.image_paths[idx])
+        attribute_path = os.path.join(self.root, "market_attribute", self.label_paths[idx])
+        img = Image.open(img_path)
+        attribute = open(attribute_path, "r")
+        
+        img = np.array(img)
+        
+        return img, attribute
+        
+    
+
+
+path_1 = 'C:\SD_Card\Summer_Research\Market-1501-v15.09.15.zip\Market-1501-v15.09.15\bounding_box_test'
+path_2 = 'C:\SD_Card\Summer_Research\market_attribute'
+data = MarketDataset(path_1, path_2)
