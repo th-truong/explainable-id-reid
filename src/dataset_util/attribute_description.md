@@ -1,11 +1,12 @@
-In the Market-1501 dataset, there are 27 attributes:
+In the Market-1501 dataset, there are 27 attributes manually labelled:
 
+## Attribute List Notes
 #### Format of the list below is: ####
 *Attribute name **(how it appears in the file)** - the label*  
 &nbsp;
 * Gender **(gender)** - male(1), female(2)
 * Hair length **(hair)** - short hair(1), long hair(2)
-* Sleeve length **(up)** - long sleeve(1), short sleeve(2)
+* Sleeve length **(up)** - long sleeve(1), short sleeve or no sleeve(2)
 * Length of lower-body clothing **(down)** - long lower body clothing(1), short lower body clothing(2)
 * Type of lower-body clothing **(clothes)** - dress(1), pants(2)
 * Wearing hat **(hat)** - no(1), yes(2)
@@ -30,6 +31,9 @@ In the Market-1501 dataset, there are 27 attributes:
 * blue lower-body clothing **(downblue)** - no(1), yes(2)
 * green lower-body clothing **(downgreen)** - no(1), yes(2)
 * brown lower-body clothing **(downbrown)** - no(1), yes(2)
+
+## Example image and some attributes (obtained from the <a href = "https://github.com/vana77/Market-1501_Attribute">GitHub Repository</a>)
+![image](https://user-images.githubusercontent.com/58268240/119695297-44049200-be0b-11eb-81bd-67627ce9cd76.png)
 
 ## Citations 
 @article{lin2019improving,
