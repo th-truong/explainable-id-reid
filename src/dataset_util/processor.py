@@ -5,6 +5,8 @@ import matplotlib as plt
 import pandas as pd 
 from scipy.io import loadmat
 from PIL import Image
+from glob import glob
+import sys
 
 class MarketDataset(object):
     def __init__(self, root_image_path, root_label_path):
@@ -27,6 +29,45 @@ class MarketDataset(object):
         map = {}
         for attr in df2:
             map[attr] = df2[attr][0][0]
+
+        self.df2 = df2
+
+    def image_loader(self, path):
+        paths = []
+
+        # Root hardcoded in right now.
+        root = "C:\\Users\\Div\\Desktop\\Research\\reid\\reid\\Market-1501-v15.09.15"
+        path = os.listdir(root)
+
+        for sub_dirs in path:
+            paths.append(os.path.join(root, sub_dirs))
+
+        bounding_box_test = []
+        bounding_box_train = []
+        gt_bbox = []
+        query = []
+
+        for img in paths:
+            name = img.rsplit("\\", 1)[1]
+            if "." not in name:
+                for img_name in os.listdir(img):
+                    if ".mat" not in img_name and ".db" not in img_name:
+                        globals()[name].append(np.array(Image.open(os.path.join(img, img_name))))
+                        print("in progress...")
+            print(f"{img} done!")
+
+        print(len(gt_bbox))
+        # Showing a random image to see it works.
+        plt.imshow(gt_bbox[1000])
+        plt.show()
+        self.bounding_box_test = bounding_box_test
+        self.bounding_box_train = bounding_box_train
+        self.gt_bbox = []
+        self.query = query
+
+    def add_path(self, path):
+        path_to_add = glob(path + "\*")
+
     def __getitem__(self, idx):
         img_path = os.path.join(self.root, "Market1501", self.image_paths[idx])
         attribute_path = os.path.join(self.root, "market_attribute", self.label_paths[idx])
