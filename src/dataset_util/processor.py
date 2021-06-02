@@ -1,86 +1,79 @@
 import os
 import numpy as np
 import torch
-import matplotlib as plt 
+import matplotlib.pyplot as plt 
 import pandas as pd 
 from scipy.io import loadmat
 from PIL import Image
 from glob import glob
 import sys
 
+os.environ['KMP_DUPLICATE_LIB_OK']='True'
+
 class MarketDataset(object):
-    def __init__(self, root_image_path, root_label_path):
-        super().__init__()
-        image_paths = []
-        label_paths = []
+    def __init__(self, root_path, image, train):
+        self.paths = []
+        self.files = []
+        self.root_path = root_path
+        self.attribute_market = self.load_mats(r"C:\\Users\\Div\\Desktop\\Research\\reid\\reid\\Market-1501-v15.09.15\\Attributes\\market_attribute.mat", train)
 
-        for path in root_image_path:
-            image_paths.append(self.add_path(path))
+        if image is True:
+            self.paths = self.add_path(root_path, 0)
+            for img in self.paths:
+                self.image_loader(img)
+        else:
+            self.paths = self.add_path(root_path, 1)
+            for mat in self.paths:
+                self.files.append(self.load_mats(mat))
 
-        for path in root_label_path:
-            label_paths.append(self.add_path(path))
-
-        self.image_paths = image_paths
-        self.label_paths = label_paths
-
-    def load_mats(self, file_name):
+    def load_mats(self, file_name, train):
         mat = loadmat(file_name)
-        df2 = pd.DataFrame.from_records(mat["market_attribute"][0][0][0][0])
+        if train is True:
+            df = pd.DataFrame.from_records(mat["market_attribute"]["train"][0][0][0])
+        elif train is False:
+            df = pd.DataFrame.from_records(mat["market_attribute"]["test"][0][0][0])
         map = {}
-        for attr in df2:
-            map[attr] = df2[attr][0][0]
-
-        self.df2 = df2
+        for attr in df:
+            map[attr] = df[attr][0][0]
+        df2 = pd.DataFrame(map)
+        return df2
 
     def image_loader(self, path):
-        paths = []
-
-        # Root hardcoded in right now.
-        root = "C:\\Users\\Div\\Desktop\\Research\\reid\\reid\\Market-1501-v15.09.15"
-        path = os.listdir(root)
-
-        for sub_dirs in path:
-            paths.append(os.path.join(root, sub_dirs))
-
-        bounding_box_test = []
-        bounding_box_train = []
-        gt_bbox = []
-        query = []
-
-        for img in paths:
-            name = img.rsplit("\\", 1)[1]
-            if "." not in name:
-                for img_name in os.listdir(img):
-                    if ".mat" not in img_name and ".db" not in img_name:
-                        globals()[name].append(np.array(Image.open(os.path.join(img, img_name))))
-                        print("in progress...")
-            print(f"{img} done!")
-
-        print(len(gt_bbox))
+        splits = path.split("\\")
+        img_name = splits[len(splits) - 1]
+        self.files.append(((np.array(Image.open(path))), self.attribute_market.loc[self.attribute_market["image_index"] == img_name[:img_name.find("_")]]))
         # Showing a random image to see it works.
-        plt.imshow(gt_bbox[1000])
-        plt.show()
-        self.bounding_box_test = bounding_box_test
-        self.bounding_box_train = bounding_box_train
-        self.gt_bbox = []
-        self.query = query
+        #plt.imshow(self.files[0][0])
+        #print(self.files[0][1])
+        #plt.show()
 
-    def add_path(self, path):
-        path_to_add = glob(path + "\*")
+    def add_path(self, path, type):
+        file_paths = []
+        for file in os.listdir(path):
+            if type == 0:
+                if file[-4:] == ".jpg":
+                    file_paths.append(os.path.join(path, file))
+            elif type == 1:
+                if file[-4:] == ".mat":
+                    file_paths.append(os.path.join(path, file))
+        return file_paths
 
     def __getitem__(self, idx):
-        img_path = os.path.join(self.root, "Market1501", self.image_paths[idx])
-        attribute_path = os.path.join(self.root, "market_attribute", self.label_paths[idx])
-        img = Image.open(img_path)
-        attribute = open(attribute_path, "r")
+        item = self.files[idx]
+        return item[0], item[1]
         
-        img = np.array(img)
-        
-        return img, attribute
-        
-    
 
+test_obj = MarketDataset("C:\\Users\\Div\\Desktop\\Research\\reid\\reid\\Market-1501-v15.09.15\\Images\\bounding_box_test", True, False)
+train_obj = MarketDataset("C:\\Users\\Div\\Desktop\\Research\\reid\\reid\\Market-1501-v15.09.15\\Images\\bounding_box_train", True, True)
 
-path_1 = 'C:\SD_Card\Summer_Research\Market-1501-v15.09.15.zip\Market-1501-v15.09.15\bounding_box_test'
-path_2 = 'C:\SD_Card\Summer_Research\market_attribute'
-data = MarketDataset(path_1, path_2)
+test_sample_image, test_sample_attr = test_obj.__getitem__(12000)
+# For train images, those image_indexes for some reason are not a part of market_attribute.mat
+# I don't know why...
+train_sample_image, train_sample_attr = train_obj.__getitem__(12000)
+
+plt.imshow(test_sample_image)
+plt.show()
+print(test_sample_attr)
+plt.imshow(train_sample_image)
+plt.show()
+print(train_sample_attr)
