@@ -1,19 +1,23 @@
 import os
 import numpy as np
 import torch
-import matplotlib.pyplot as plt 
-import pandas as pd 
+import matplotlib.pyplot as plt
+import pandas as pd
 from scipy.io import loadmat
 from PIL import Image
 import sys
+import confuse
+from pathlib import Path
 
-os.environ['KMP_DUPLICATE_LIB_OK']='True'
+os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
+
 
 class MarketDataset(object):
     def __init__(self, root_path, image, train):
         self.paths = []
         self.root_path = root_path
-        self.attribute_market = self.load_mats(r"C:\\Users\\Div\\Desktop\\Research\\reid\\reid\\Market-1501-v15.09.15\\Attributes\\market_attribute.mat", train)
+        self.attribute_market = self.load_mats(
+            config['market_1501_ds']['att_path'].get(), train)
 
         if image is True:
             self.paths = self.add_path(root_path, 0)
@@ -24,9 +28,11 @@ class MarketDataset(object):
     def load_mats(self, file_name, train):
         mat = loadmat(file_name)
         if train is True:
-            df = pd.DataFrame.from_records(mat["market_attribute"]["train"][0][0][0])
+            df = pd.DataFrame.from_records(
+                mat["market_attribute"]["train"][0][0][0])
         elif train is False:
-            df = pd.DataFrame.from_records(mat["market_attribute"]["test"][0][0][0])
+            df = pd.DataFrame.from_records(
+                mat["market_attribute"]["test"][0][0][0])
         map = {}
         for attr in df:
             map[attr] = df[attr][0][0]
@@ -59,11 +65,15 @@ class MarketDataset(object):
         plt.imshow(img)
         plt.show()
         print(attr)
-        
+
 
 if __name__ == "__main__":
-    test_obj = MarketDataset("C:\\Users\\Div\\Desktop\\Research\\reid\\reid\\Market-1501-v15.09.15\\Images\\bounding_box_test", True, False)
-    train_obj = MarketDataset("C:\\Users\\Div\\Desktop\\Research\\reid\\reid\\Market-1501-v15.09.15\\Images\\bounding_box_train", True, True)
+    config = confuse.Configuration('market1501', __name__)
+    config.set_file(Path(r"D:\\Summer_Research\\Reid\\market1501.yml"))
+    test_obj = MarketDataset(
+        config['market_1501_ds']['test_path'].get(), True, False)
+    train_obj = MarketDataset(
+        config['market_1501_ds']['train_path'].get(), True, True)
 
     test_obj.view_sample(12000)
     train_obj.view_sample(12000)
