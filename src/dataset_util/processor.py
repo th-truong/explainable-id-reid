@@ -69,7 +69,7 @@ class MarketDataset(object):
 
 if __name__ == "__main__":
     config = confuse.Configuration('market1501', __name__)
-    config.set_file(Path(r"D:\\Summer_Research\\Reid\\market1501.yml"))
+    config.set_file(Path(r"C:\\Users\\Div\\Desktop\\Research\\reid\\reid\\explainable-id-reid\\src\\dataset_util\\market1501.yml"))
     test_obj = MarketDataset(
         config['market_1501_ds']['test_path'].get(), True, False)
     train_obj = MarketDataset(

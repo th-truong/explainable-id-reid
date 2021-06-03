@@ -1,4 +1,4 @@
 market_1501_ds:
-  test_path: "D:\\Summer_Research\\Reid\Images\\bounding_box_test"
-  train_path: "D:\\Summer_Research\\Reid\\Images\\bounding_box_train"
-  att_path: r"D:\\Summer_Research\\Reid\Attributes\\market_attribute.mat"
+  test_path: "C:\\Users\\Div\\Desktop\\Research\\reid\\reid\\Market-1501-v15.09.15\\Images\\bounding_box_test"
+  train_path: "C:\\Users\\Div\\Desktop\\Research\\reid\\reid\\Market-1501-v15.09.15\\Images\\bounding_box_train"
+  att_path: "C:\\Users\\Div\\Desktop\\Research\\reid\\reid\\Market-1501-v15.09.15\\Attributes\\market_attribute.mat"
