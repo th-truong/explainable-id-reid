@@ -37,6 +37,12 @@ class MarketDataset(object):
         for attr in df:
             map[attr] = df[attr][0][0]
         df2 = pd.DataFrame(map)
+        for attr in df:
+            map[attr] = df[attr][0][0]
+        df2 = pd.DataFrame(map)
+        for col in list(df2.columns):
+            if col != "age" and col != "image_index":
+                df2[col] -= 1
         return df2
 
     def image_loader(self, path):
