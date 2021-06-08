@@ -17,7 +17,7 @@ class MarketDataset(object):
         self.paths = []
         self.root_path = root_path
         self.attribute_market = self.load_mats(
-            config['market_1501_ds']['att_path'].get(), train)
+            "D:\\Summer_Research\\Reid\\Attributes\\market_attribute.mat", train)
 
         if image is True:
             self.paths = self.add_path(root_path, 0)
@@ -71,6 +71,7 @@ class MarketDataset(object):
         plt.imshow(img)
         plt.show()
         print(attr)
+        return img, attr
 
 
 if __name__ == "__main__":
