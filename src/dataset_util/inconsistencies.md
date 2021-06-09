@@ -4,3 +4,6 @@ Subject 0884 in the bounding_box_train set has attributes which are all indiciat
 Shown below is one the images of this subject:
 <br>
 ![image](https://user-images.githubusercontent.com/58268240/121411855-4db8ea00-c921-11eb-83bc-959b0cc3a31a.png)
+
+
+All Other Inconsistencies:
