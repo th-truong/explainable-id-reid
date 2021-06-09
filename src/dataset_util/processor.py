@@ -17,7 +17,7 @@ class MarketDataset(object):
         self.paths = []
         self.root_path = root_path
         self.attribute_market = self.load_mats(
-            "D:\\Summer_Research\\Reid\\Attributes\\market_attribute.mat", train)
+            config['market_1501_ds']['att_path'].get(), train)
 
         if image is True:
             self.paths = self.add_path(root_path, 0)
@@ -34,9 +34,6 @@ class MarketDataset(object):
             df = pd.DataFrame.from_records(
                 mat["market_attribute"]["test"][0][0][0])
         map = {}
-        for attr in df:
-            map[attr] = df[attr][0][0]
-        df2 = pd.DataFrame(map)
         for attr in df:
             map[attr] = df[attr][0][0]
         df2 = pd.DataFrame(map)
@@ -63,15 +60,24 @@ class MarketDataset(object):
 
     def __getitem__(self, idx):
         img, attributes = self.image_loader(self.paths[idx])
-        return img, attributes
+        self.targets = {}
+        cols = list(attributes.columns)
+        for col in cols:
+            if col == "age":
+                age_list = [0] * 4
+                age_list[attributes[col].item() - 1] = 1
+                self.targets[col] = torch.Tensor(age_list)
+            else:
+                self.targets[col] = torch.tensor(int(attributes[col].item()))
+        return (img, self.targets)
 
     # Need a view_sample method
     def view_sample(self, idx):
-        img, attr = self.__getitem__(idx)
+        img, attr_map = self.__getitem__(idx)
         plt.imshow(img)
         plt.show()
-        print(attr)
-        return img, attr
+        print(attr_map)
+        return (img, attr_map)
 
 
 if __name__ == "__main__":
@@ -83,5 +89,5 @@ if __name__ == "__main__":
     train_obj = MarketDataset(
         config['market_1501_ds']['train_path'].get(), True, True)
 
-    test_obj.view_sample(12000)
-    train_obj.view_sample(12000)
+    test_obj.view_sample(14560)
+    train_obj.view_sample(10560)
