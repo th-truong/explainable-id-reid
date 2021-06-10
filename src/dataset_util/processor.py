@@ -79,7 +79,6 @@ class MarketDataset(object):
         print(attr_map)
         return (img, attr_map)
 
-
 if __name__ == "__main__":
     config = confuse.Configuration('market1501', __name__)
     config.set_file(Path(r"C:\\Users\\Div\\Desktop\\Research\\reid\\reid\\explainable-id-reid\\src\\dataset_util\\market1501.yml"))
