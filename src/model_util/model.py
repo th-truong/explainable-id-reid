@@ -1,5 +1,3 @@
-
-from processor import MarketDataset
 from torchvision.models.detection.backbone_utils import resnet_fpn_backbone
 import torchvision
 import sys
@@ -8,6 +6,7 @@ import confuse
 from pathlib import Path
 import torch
 import numpy as np
+from dataset_util.processor import MarketDataset
 
 config = confuse.Configuration('market1501', __name__)
 config.set_file(Path(
