@@ -1,4 +1,4 @@
-In the Market-1501 dataset, there are 27 attributes manually labelled:
+## In the Market-1501 dataset, there are 27 attributes manually labelled. ##
 
 ## Attribute List Notes
 #### Format of the list below is: ####
