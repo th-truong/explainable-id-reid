@@ -61,12 +61,36 @@ class MarketDataset(object):
     def __getitem__(self, idx):
         img, attributes = self.image_loader(self.paths[idx])
         self.targets = {}
-        cols = list(attributes.columns)
+        # Always sorted alphabetically
+        cols = sorted(list(attributes.columns))
+        # Index positions: [upblack, upblue, upgray, upgreen, uppurple, upred, upwhite, upyellow]
+        up_colours = []
+        # Index positions: [downblack, downblue, downbrown, downgray, downgreen, downpink, downpurple, downwhite, downyellow]
+        down_colours = []
         for col in cols:
+            # No need to include image_index
+            if col == "image_index":
+                continue
+            # Creating a one-hot encoded for age
             if col == "age":
                 age_list = [0] * 4
                 age_list[attributes[col].item() - 1] = 1
                 self.targets[col] = torch.Tensor(age_list)
+            # Grouping the up colors together since they are mutually exclusive
+            elif "up" in col and col != "up":
+                up_colours.append(int(attributes[col].item()))
+                # Since there are 9 attributes that contain "up" in it, but one of them is 
+                # just "up", which does not correspond to colours, we subtracted one to indicate completion.
+                if len(up_colours) == sum("up" in c for c in cols) - 1:
+                    self.targets["up_colours"] = torch.tensor(up_colours)
+            # Grouping the down colors together since they are mutually exclusive
+            elif "down" in col and col != "down":
+                down_colours.append(int(attributes[col].item()))
+                # Since there are 9 attributes that contain "down" in it, but one of them is 
+                # just "down", which does not correspond to colours, we subtracted one to indicate completion.
+                if len(down_colours) == sum("down" in c for c in cols) - 1:
+                    self.targets["down_colours"] = torch.tensor(down_colours)
+            # For all other attributes.
             else:
                 self.targets[col] = torch.tensor(int(attributes[col].item()))
         return (img, self.targets)

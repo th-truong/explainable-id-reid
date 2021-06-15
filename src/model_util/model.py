@@ -6,11 +6,32 @@ import confuse
 from pathlib import Path
 import torch
 import numpy as np
+import torch.nn as nn
+
+class Classifier(nn.Module):
+    def __init__(self, num_features, num_layers):
+        super().__init__()
+        self.linears = nn.ModuleList([nn.Linear(num_features, 64)])
+        self.linears.extend([nn.Linear(64, 64) for i in range(num_layers - 1)])
+        length = len(self.linears)
+        i = 0
+        while i < length:
+            if i%2 == 1 and i != length - 1:
+                self.linears.insert(i, [nn.Dropout()])
+            i+=1
+            length = len(self.linears)
+        i = 1
+        length = len(self.linears)
+        while i < length:
+            self.linears.insert(i, [nn.ReLU()])
+            i += 2
+            length = len(self.linears)
+        print(self.linears)
 
 if __name__ == "__main__":
     config = confuse.Configuration('market1501', __name__)
     config.set_file(Path(r"C:\\Users\\Div\\Desktop\\Research\\reid\\reid\\explainable-id-reid\\src\\dataset_util\\market1501.yml"))
-    from dataset_util.processor import MarketDataset
+    from processor import MarketDataset
     test_obj = MarketDataset(
         config['market_1501_ds']['test_path'].get(), True, False)
     train_obj = MarketDataset(
@@ -28,3 +49,6 @@ if __name__ == "__main__":
     out = backbone(trainimg_np.float())
     print(trainimg_np.shape)
     print([(k, v.shape) for k, v in out.items()])
+
+    print("\n\n\n\n\n\n\n\n\n\n\n")
+    obj = Classifier(4, 4)
