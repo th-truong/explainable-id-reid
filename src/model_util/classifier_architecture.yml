@@ -1,0 +1,151 @@
+hidden_layers:
+  - type: linear
+    kwargs:
+      in_features: 512
+      out_features: 512
+      bias: true
+  - type: relu_activation
+    kwargs:
+      inplace: true
+  - type: dropout
+    kwargs:
+      p: 0.5
+      inplace: true
+
+  - type: linear
+    kwargs:
+      in_features: 512
+      out_features: 256
+      bias: true
+  - type: relu_activation
+    kwargs:
+      inplace: true
+  - type: dropout
+    kwargs:
+      p: 0.5
+      inplace: true
+
+  - type: linear
+    kwargs:
+      in_features: 256
+      out_features: 512
+      bias: true
+  - type: relu_activation
+    kwargs:
+      inplace: true
+  - type: dropout
+    kwargs:
+      p: 0.5
+      inplace: true
+
+  - type: linear
+    kwargs:
+      in_features: 512
+      out_features: 256
+      bias: true
+  - type: relu_activation
+    kwargs:
+      inplace: true
+
+  - type: linear
+    kwargs:
+      in_features: 256
+      out_features: 256
+      bias: true
+
+attribute_classification_layers:
+  - type: linear
+    attribute: age
+    activation: softmax
+    kwargs:
+      in_features: 256
+      out_features: 4
+      bias: true
+
+  - type: linear
+    attribute: backpack
+    activation: sigmoid
+    kwargs:
+      in_features: 256
+      out_features: 4
+      bias: true
+
+  - type: linear
+    attribute: bag
+    activation: sigmoid
+    kwargs:
+      in_features: 256
+      out_features: 4
+      bias: true
+
+  - type: linear
+    attribute: clothes
+    activation: sigmoid
+    kwargs:
+      in_features: 256
+      out_features: 4
+      bias: true
+
+  - type: linear
+    attribute: down
+    activation: sigmoid
+    kwargs:
+      in_features: 256
+      out_features: 4
+      bias: true
+
+  - type: linear
+    attribute: down_colours
+    activation: softmax
+    kwargs:
+      in_features: 256
+      out_features: 9
+      bias: true
+
+  - type: linear
+    attribute: gender
+    activation: sigmoid
+    kwargs:
+      in_features: 256
+      out_features: 4
+      bias: true
+
+  - type: linear
+    attribute: hair
+    activation: sigmoid
+    kwargs:
+      in_features: 256
+      out_features: 4
+      bias: true
+
+  - type: linear
+    attribute: handbag
+    activation: sigmoid
+    kwargs:
+      in_features: 256
+      out_features: 4
+      bias: true
+
+  - type: linear
+    attribute: hat
+    activation: sigmoid
+    kwargs:
+      in_features: 256
+      out_features: 4
+      bias: true
+
+  - type: linear
+    attribute: up
+    activation: sigmoid
+    kwargs:
+      in_features: 256
+      out_features: 4
+      bias: true
+
+  - type: linear
+    attribute: up_colours
+    activation: softmax
+    kwargs:
+      in_features: 256
+      out_features: 8
+      bias: true

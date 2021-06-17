@@ -11,19 +11,33 @@ import torch.nn as nn
 class Classifier(nn.Module):
     # configurable, default activation layer is ReLU, but can be changed. Default setting for dropout
     # is False (not included), but can do so
-    def __init__(self, num_features, num_layers, hidden_output_size, overall_output_size, 
-                 activation = nn.ReLU(), dropout = False):
+    def __init__(self, classifier_params):
         super().__init__()
-        self.linears = nn.ModuleList([nn.Linear(num_features, hidden_output_size)])
+        layers_to_add = classifier_params["hidden_layers"]
+        self.layers = nn.ModuleList()
+        for layer in layers_to_add:
+            if layer['type'] == 'linear':
+                self.layers.append(nn.Linear(**layer['kwargs']))
+            elif layer['type'] == 'relu_activation':
+                self.layers.append(nn.ReLU(**layer['kwargs']))
+            elif layer['type'] == 'dropout':
+                self.layers.append(nn.Dropout(**layer['kwargs']))
+        print(self.layers)
+        self.attribute_classifier(classifier_params)
 
-        for i in range(num_layers - 2):
-            self.linears.append(activation)
-            if dropout is True:
-                self.linears.append(nn.Dropout())
-            self.linears.append(nn.Linear(hidden_output_size, hidden_output_size))
-        self.linears.append(activation)
-        self.linears.append(nn.Linear(hidden_output_size, overall_output_size))
-        print(self.linears)
+    def attribute_classifier(self, classifier_params):
+        layers_to_add = classifier_params["attribute_classification_layers"]
+        self.attribute_layers = nn.ModuleList()
+        for layer in layers_to_add:
+            if layer['type'] == 'linear':
+                self.attribute_layers.append(nn.Linear(**layer['kwargs']))
+                if layer['activation'] == 'softmax':
+                    self.attribute_layers.append(nn.Softmax())
+                elif layer['activation'] == 'sigmoid':
+                    self.attribute_layers.append(nn.Sigmoid())
+                setattr(self, layer['attribute'], self.attribute_layers)
+                self.attribute_layers = nn.ModuleList()
+        print(self.__dir__)
 
 if __name__ == "__main__":
     config = confuse.Configuration('market1501', __name__)
@@ -48,4 +62,8 @@ if __name__ == "__main__":
     print([(k, v.shape) for k, v in out.items()])
 
     print("\n\n\n\n\n\n\n\n\n\n\n")
-    obj = Classifier(4, 4, 64, 4, activation = nn.Tanh(), dropout=True)
+
+    cfg = confuse.Configuration('model_architecture', __name__, read= False)
+    cfg.set_file("C:\\Users\\Div\\Desktop\\Research\\reid\\reid\\explainable-id-reid\\src\\model_util\\classifier_architecture.yml")
+    classifier_params = cfg.get()
+    obj = Classifier(classifier_params)
