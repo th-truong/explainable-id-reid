@@ -10,24 +10,22 @@ import torch.nn as nn
 
 
 class Classifier(nn.Module):
-    def __init__(self, num_features, num_layers):
+    # configurable, default activation layer is ReLU, but can be changed. Default setting for dropout
+    # is False (not included), but can do so
+    def __init__(self, num_features, num_layers, hidden_output_size, overall_output_size, activation=nn.ReLU(), dropout=False):
         super().__init__()
-        self.linears = nn.ModuleList([nn.Linear(num_features, 64)])
-        self.linears.extend([nn.Linear(64, 64) for i in range(num_layers - 1)])
-        length = len(self.linears)
-        i = 0
-        while i < length:
-            if i % 2 == 1 and i != length - 1:
-                self.linears.insert(i, [nn.Dropout()])
-            i += 1
-            length = len(self.linears)
-        i = 1
-        length = len(self.linears)
-        while i < length:
-            self.linears.insert(i, [nn.ReLU()])
-            i += 2
-            length = len(self.linears)
+        self.linears = nn.ModuleList(
+            [nn.Linear(num_features, hidden_output_size)])
+        for i in range(num_layers - 2):
+            self.linears.append(activation)
+            if dropout is True:
+                self.linears.append(nn.Dropout())
+            self.linears.append(
+                nn.Linear(hidden_output_size, hidden_output_size))
+        self.linears.append(activation)
+        self.linears.append(nn.Linear(hidden_output_size, overall_output_size))
         print(self.linears)
+        print(nn.Sequential(*self.linears))
 
 
 if __name__ == "__main__":
@@ -55,4 +53,4 @@ if __name__ == "__main__":
     print([(k, v.shape) for k, v in out.items()])
 
     print("\n\n\n\n\n\n\n\n\n\n\n")
-    obj = Classifier(4, 4)
+    obj = Classifier(4, 4, 64, 4, activation=nn.Tanh(), dropout=True)
