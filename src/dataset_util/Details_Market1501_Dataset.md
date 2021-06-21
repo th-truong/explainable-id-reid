@@ -59,3 +59,5 @@ pages = {},
 title = {Sequence-based Person Attribute Recognition with Joint CTC-Attention Model}
 }
 
+* ![image](https://user-images.githubusercontent.com/58268240/122837006-96bd5680-d2b0-11eb-9257-5019eb0dfee6.png)
+@ARTICLE{9045945,  author={Wu, Jingjing and Liu, Hao and Jiang, Jianguo and Qi, Meibin and Ren, Bo and Li, Xiaohong and Wang, Yashen},  journal={IEEE Transactions on Circuits and Systems for Video Technology},   title={Person Attribute Recognition by Sequence Contextual Relation Learning},   year={2020},  volume={30},  number={10},  pages={3398-3412},  doi={10.1109/TCSVT.2020.2982962}}
