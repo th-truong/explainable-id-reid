@@ -1,6 +1,11 @@
 hidden_layers:
   - type: linear
     kwargs:
+      # in_features to use based on Resnet50-FPN backbone output being passed:
+      # For '1', 4096
+      # For '2', 2048
+      # For '3', 1024
+      # For '4', 512
       in_features: 512
       out_features: 512
       bias: true
@@ -11,6 +16,7 @@ hidden_layers:
     kwargs:
       p: 0.5
       inplace: true
+
   - type: linear
     kwargs:
       in_features: 512
@@ -23,6 +29,7 @@ hidden_layers:
     kwargs:
       p: 0.5
       inplace: true
+
   - type: linear
     kwargs:
       in_features: 256
@@ -35,6 +42,7 @@ hidden_layers:
     kwargs:
       p: 0.5
       inplace: true
+
   - type: linear
     kwargs:
       in_features: 512
@@ -43,11 +51,13 @@ hidden_layers:
   - type: relu_activation
     kwargs:
       inplace: true
+
   - type: linear
     kwargs:
       in_features: 256
       out_features: 256
       bias: true
+
 attribute_classification_layers:
   - type: linear
     attribute: age
@@ -56,34 +66,39 @@ attribute_classification_layers:
       in_features: 256
       out_features: 4
       bias: true
+
   - type: linear
     attribute: backpack
     activation: sigmoid
     kwargs:
       in_features: 256
-      out_features: 4
+      out_features: 1
       bias: true
+
   - type: linear
     attribute: bag
     activation: sigmoid
     kwargs:
       in_features: 256
-      out_features: 4
+      out_features: 1
       bias: true
+
   - type: linear
     attribute: clothes
     activation: sigmoid
     kwargs:
       in_features: 256
-      out_features: 4
+      out_features: 1
       bias: true
+
   - type: linear
     attribute: down
     activation: sigmoid
     kwargs:
       in_features: 256
-      out_features: 4
+      out_features: 1
       bias: true
+
   - type: linear
     attribute: down_colours
     activation: softmax
@@ -91,41 +106,47 @@ attribute_classification_layers:
       in_features: 256
       out_features: 9
       bias: true
+
   - type: linear
     attribute: gender
     activation: sigmoid
     kwargs:
       in_features: 256
-      out_features: 4
+      out_features: 1
       bias: true
+
   - type: linear
     attribute: hair
     activation: sigmoid
     kwargs:
       in_features: 256
-      out_features: 4
+      out_features: 1
       bias: true
+
   - type: linear
     attribute: handbag
     activation: sigmoid
     kwargs:
       in_features: 256
-      out_features: 4
+      out_features: 1
       bias: true
+
   - type: linear
     attribute: hat
     activation: sigmoid
     kwargs:
       in_features: 256
-      out_features: 4
+      out_features: 1
       bias: true
+
   - type: linear
     attribute: up
     activation: sigmoid
     kwargs:
       in_features: 256
-      out_features: 4
+      out_features: 1
       bias: true
+
   - type: linear
     attribute: up_colours
     activation: softmax

@@ -8,6 +8,8 @@ from PIL import Image
 import sys
 import confuse
 from pathlib import Path
+from torchvision.transforms import functional as F
+import traceback
 
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 
@@ -15,18 +17,25 @@ os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 class MarketDataset(object):
     def __init__(self, root_path, image, train):
         self.paths = []
-        self.root_path = root_path
         config = confuse.Configuration('market1501', __name__)
         config.set_file(Path(
             r"C:\\Users\\netra\\GithubEncm369\\reid\\explainable-id-reid\\src\\dataset_util\\market1501.yml"))
+        self.train = train
+        self.root_path = root_path
         self.attribute_market = self.load_mats(
             config['market_1501_ds']['att_path'].get(), train)
-
         if image is True:
             self.paths = self.add_path(root_path, 0)
-
         else:
             self.paths = self.add_path(root_path, 1)
+
+    def __len__(self):
+        if self.train is True:
+            print(len(list(os.listdir(self.root_path))) - 1)
+            return len(list(os.listdir(self.root_path))) - 1
+        else:
+            print(len(list(os.listdir(self.root_path))))
+            return len(list(os.listdir(self.root_path))) - 6677
 
     def load_mats(self, file_name, train):
         mat = loadmat(file_name)
@@ -70,40 +79,49 @@ class MarketDataset(object):
         up_colours = []
         # Index positions: [downblack, downblue, downbrown, downgray, downgreen, downpink, downpurple, downwhite, downyellow]
         down_colours = []
+        # print(attributes[cols[0]].item())
         for col in cols:
             # No need to include image_index
             if col == "image_index":
                 continue
             # Creating a one-hot encoded for age
-            if col == "age":
-                age_list = [0] * 4
-                age_list[attributes[col].item() - 1] = 1
-                self.targets[col] = torch.Tensor(age_list)
-            # Grouping the up colors together since they are mutually exclusive
-            elif "up" in col and col != "up":
-                up_colours.append(int(attributes[col].item()))
-                # Since there are 9 attributes that contain "up" in it, but one of them is
-                # just "up", which does not correspond to colours, we subtracted one to indicate completion.
-                if len(up_colours) == sum("up" in c for c in cols) - 1:
-                    self.targets["up_colours"] = torch.tensor(up_colours)
-            # Grouping the down colors together since they are mutually exclusive
-            elif "down" in col and col != "down":
-                down_colours.append(int(attributes[col].item()))
-                # Since there are 9 attributes that contain "down" in it, but one of them is
-                # just "down", which does not correspond to colours, we subtracted one to indicate completion.
-                if len(down_colours) == sum("down" in c for c in cols) - 1:
-                    self.targets["down_colours"] = torch.tensor(down_colours)
-            # For all other attributes.
-            else:
-                self.targets[col] = torch.tensor(int(attributes[col].item()))
+            try:
+                if col == "age":
+                    age_list = [0] * 4
+                    age_list[int(attributes[col].item()) - 1] = 1
+                    self.targets[col] = torch.Tensor(age_list)
+                # Grouping the up colors together since they are mutually exclusive
+                elif "up" in col and col != "up":
+                    # print(attributes[col])
+                    up_colours.append(int(attributes[col].item()))
+                    # Since there are 9 attributes that contain "up" in it, but one of them is
+                    # just "up", which does not correspond to colours, we subtracted one to indicate completion.
+                    if len(up_colours) == sum("up" in c for c in cols) - 1:
+                        self.targets["up_colours"] = torch.tensor(up_colours)
+                # Grouping the down colors together since they are mutually exclusive
+                elif "down" in col and col != "down":
+                    down_colours.append(int(attributes[col].item()))
+                    # Since there are 9 attributes that contain "down" in it, but one of them is
+                    # just "down", which does not correspond to colours, we subtracted one to indicate completion.
+                    if len(down_colours) == sum("down" in c for c in cols) - 1:
+                        self.targets["down_colours"] = torch.tensor(
+                            down_colours)
+                # For all other attributes.
+                else:
+                    self.targets[col] = torch.tensor(
+                        int(attributes[col].item()))
+            except:
+                continue
+        img = F.to_tensor(img)
         return (img, self.targets)
-
     # Need a view_sample method
+
     def view_sample(self, idx):
         img, attr_map = self.__getitem__(idx)
         plt.imshow(img)
         plt.show()
         print(attr_map)
+        img = F.to_tensor(img)
         return (img, attr_map)
 
 
@@ -115,6 +133,5 @@ if __name__ == "__main__":
         config['market_1501_ds']['test_path'].get(), True, False)
     train_obj = MarketDataset(
         config['market_1501_ds']['train_path'].get(), True, True)
-
     test_obj.view_sample(14560)
     train_obj.view_sample(10560)

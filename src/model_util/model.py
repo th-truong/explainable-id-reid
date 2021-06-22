@@ -1,6 +1,5 @@
-
-import torchvision
 from torchvision.models.detection.backbone_utils import resnet_fpn_backbone
+import torchvision
 import sys
 import os
 import confuse
@@ -57,6 +56,7 @@ class Classifier(nn.Module):
         for layer in self.layers:
             x = layer(x)
         print(x.shape)
+
         attribute_predictions = {}
         for attr_key in list(self.attribute_layers_dict.keys()):
             attribute_predictions[attr_key] = self.attribute_layers_dict[attr_key](
@@ -77,21 +77,40 @@ if __name__ == "__main__":
         config['market_1501_ds']['test_path'].get(), True, False)
     train_obj = MarketDataset(
         config['market_1501_ds']['train_path'].get(), True, True)
-    torch_ds = torch.utils.data.DataLoader(test_obj,
-                                           batch_size=2, num_workers=8,
-                                           collate_fn=collate_fn)
-    print(torch_ds)
-    for batch_ndx, sample in enumerate(torch_ds):
-        print(batch_ndx)
-        print(sample)
-    testimg, testattr = torch_ds[12560]
-    trainimg, trainattr = train_obj[10560]
+
+    bad = 0
+    good = 0
+    torch_ds_test = torch.utils.data.DataLoader(test_obj,
+                                                batch_size=2, num_workers=8,
+                                                collate_fn=collate_fn)
+    torch_ds_train = torch.utils.data.DataLoader(train_obj,
+                                                 batch_size=2, num_workers=8,
+                                                 collate_fn=collate_fn)
+
+    attr_train = []
+    count = 0
+    test_data = iter(torch_ds_test)
+    for img, attr in test_data:
+        count += 1
+    print(f"Count of test: {count}")
+    train_data = iter(torch_ds_train)
+    count = 0
+    for img, attr in train_data:
+        attr_train.append(attr)
+        count += 1
+    print(f"Count of train: {count}")
+    print(attr_train[1])
+    print(attr_train[2])
+    unmatched_item = set(attr_train[1][0].items()) ^ set(
+        attr_train[1][1].items())
+    print(unmatched_item)
     trainimg = np.true_divide(trainimg, 255)
     backbone = resnet_fpn_backbone(
         'resnet50', pretrained=True, trainable_layers=3)
     #trainimg_np = torch.from_numpy(trainimg).type('torch.DoubleTensor')
     #trainimg_np = torch.as_tensor(trainimg_np).type('torch.DoubleTensor')
     print("THIS: ", trainimg.shape)
+
     #trainimg_np = trainimg_np.unsqueeze(3)
     #trainimg_np = torch.reshape(trainimg, (64, 3, 128, 1))
     trainimg_np = trainimg.to(torch.double)
@@ -99,6 +118,7 @@ if __name__ == "__main__":
     print(trainimg_np.shape)
     print([(k, v.shape) for k, v in out.items()])
     print(out['2'].shape)
+
     print("\n\n\n\n\n\n\n\n\n\n\n")
     cfg = confuse.Configuration('model_architecture', __name__, read=False)
     cfg.set_file(
