@@ -47,3 +47,17 @@ area to the union area.
 * If the ratio is larger than 50%, the DPM bounding box is marked as "good"; if the ratio is smaller than
 20%, the bounding boxe is marked as "distractor";otherwise, it is marked as "junk", meaning that
 this image is of zero influence to the re-identification accuracy.
+
+## Other results from papers
+### Attribute Classification:
+* ![image](https://user-images.githubusercontent.com/58268240/122836687-efd8ba80-d2af-11eb-8b6a-e6c0bf00daed.png)
+@unknown{unknown,
+author = {Liu, Hao and Wu, Jingjing and Jiang, Jianguo and Qi, Meibin and Bo, Ren},
+year = {2018},
+month = {11},
+pages = {},
+title = {Sequence-based Person Attribute Recognition with Joint CTC-Attention Model}
+}
+
+* ![image](https://user-images.githubusercontent.com/58268240/122837006-96bd5680-d2b0-11eb-9257-5019eb0dfee6.png)
+@ARTICLE{9045945,  author={Wu, Jingjing and Liu, Hao and Jiang, Jianguo and Qi, Meibin and Ren, Bo and Li, Xiaohong and Wang, Yashen},  journal={IEEE Transactions on Circuits and Systems for Video Technology},   title={Person Attribute Recognition by Sequence Contextual Relation Learning},   year={2020},  volume={30},  number={10},  pages={3398-3412},  doi={10.1109/TCSVT.2020.2982962}}
