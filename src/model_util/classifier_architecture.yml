@@ -72,7 +72,7 @@ attribute_classification_layers:
     activation: sigmoid
     kwargs:
       in_features: 256
-      out_features: 4
+      out_features: 1
       bias: true
 
   - type: linear
@@ -80,7 +80,7 @@ attribute_classification_layers:
     activation: sigmoid
     kwargs:
       in_features: 256
-      out_features: 4
+      out_features: 1
       bias: true
 
   - type: linear
@@ -88,7 +88,7 @@ attribute_classification_layers:
     activation: sigmoid
     kwargs:
       in_features: 256
-      out_features: 4
+      out_features: 1
       bias: true
 
   - type: linear
@@ -96,7 +96,7 @@ attribute_classification_layers:
     activation: sigmoid
     kwargs:
       in_features: 256
-      out_features: 4
+      out_features: 1
       bias: true
 
   - type: linear
@@ -112,7 +112,7 @@ attribute_classification_layers:
     activation: sigmoid
     kwargs:
       in_features: 256
-      out_features: 4
+      out_features: 1
       bias: true
 
   - type: linear
@@ -120,7 +120,7 @@ attribute_classification_layers:
     activation: sigmoid
     kwargs:
       in_features: 256
-      out_features: 4
+      out_features: 1
       bias: true
 
   - type: linear
@@ -128,7 +128,7 @@ attribute_classification_layers:
     activation: sigmoid
     kwargs:
       in_features: 256
-      out_features: 4
+      out_features: 1
       bias: true
 
   - type: linear
@@ -136,7 +136,7 @@ attribute_classification_layers:
     activation: sigmoid
     kwargs:
       in_features: 256
-      out_features: 4
+      out_features: 1
       bias: true
 
   - type: linear
@@ -144,7 +144,7 @@ attribute_classification_layers:
     activation: sigmoid
     kwargs:
       in_features: 256
-      out_features: 4
+      out_features: 1
       bias: true
 
   - type: linear

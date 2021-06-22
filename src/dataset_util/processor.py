@@ -8,6 +8,7 @@ from PIL import Image
 import sys
 import confuse
 from pathlib import Path
+from torchvision.transforms import functional as F
 
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 
@@ -101,6 +102,7 @@ class MarketDataset(object):
         plt.imshow(img)
         plt.show()
         print(attr_map)
+        img = F.to_tensor(img)
         return (img, attr_map)
 
 if __name__ == "__main__":
