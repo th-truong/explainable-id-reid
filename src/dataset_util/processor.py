@@ -14,24 +14,34 @@ os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 
 
 class MarketDataset(object):
-    def __init__(self, root_path, image, train):
+    # the modes are:
+    # 0 - train
+    # 1 - validate
+    # 2 - test
+    def __init__(self, root_path, image, mode):
         self.paths = []
+        self.mode = mode
         self.root_path = root_path
         self.attribute_market = self.load_mats(
-            config['market_1501_ds']['att_path'].get(), train)
+            config['market_1501_ds']['att_path'].get(), mode)
 
+        # The second parameter in add_path is 0 for images, 1 for .mat files
         if image is True:
             self.paths = self.add_path(root_path, 0)
 
         else:
             self.paths = self.add_path(root_path, 1)
 
-    def load_mats(self, file_name, train):
+    def __len__(self):
+        print(len(self.paths))
+        return len(self.paths)
+
+    def load_mats(self, file_name, mode):
         mat = loadmat(file_name)
-        if train is True:
+        if mode == 0 or mode == 1:
             df = pd.DataFrame.from_records(
                 mat["market_attribute"]["train"][0][0][0])
-        elif train is False:
+        elif mode == 2:
             df = pd.DataFrame.from_records(
                 mat["market_attribute"]["test"][0][0][0])
         map = {}
@@ -50,10 +60,21 @@ class MarketDataset(object):
 
     def add_path(self, path, type):
         file_paths = []
+        temp_count = 0
         for file in os.listdir(path):
             if type == 0:
                 if file[-4:] == ".jpg":
-                    file_paths.append(os.path.join(path, file))
+                    # For validation, indexes from 0002 to 0199 (100 identities) are used. 
+                    # Everything else is used for training (0201 onwards).
+                    if self.mode == 0:
+                        if int(file[0:4]) > 199:
+                            file_paths.append(os.path.join(path, file))
+                    elif self.mode == 1:
+                        if int(file[0:4]) <= 199:
+                            file_paths.append(os.path.join(path, file))
+                    elif self.mode == 2:
+                        if file[0:2] != "-1" and file[0:4] != "0000":
+                            file_paths.append(os.path.join(path, file))
             elif type == 1:
                 if file[-4:] == ".mat":
                     file_paths.append(os.path.join(path, file))
@@ -68,32 +89,38 @@ class MarketDataset(object):
         up_colours = []
         # Index positions: [downblack, downblue, downbrown, downgray, downgreen, downpink, downpurple, downwhite, downyellow]
         down_colours = []
+        # print(attributes[cols[0]].item())
         for col in cols:
             # No need to include image_index
             if col == "image_index":
                 continue
             # Creating a one-hot encoded for age
-            if col == "age":
-                age_list = [0] * 4
-                age_list[attributes[col].item() - 1] = 1
-                self.targets[col] = torch.Tensor(age_list)
-            # Grouping the up colors together since they are mutually exclusive
-            elif "up" in col and col != "up":
-                up_colours.append(int(attributes[col].item()))
-                # Since there are 9 attributes that contain "up" in it, but one of them is 
-                # just "up", which does not correspond to colours, we subtracted one to indicate completion.
-                if len(up_colours) == sum("up" in c for c in cols) - 1:
-                    self.targets["up_colours"] = torch.tensor(up_colours)
-            # Grouping the down colors together since they are mutually exclusive
-            elif "down" in col and col != "down":
-                down_colours.append(int(attributes[col].item()))
-                # Since there are 9 attributes that contain "down" in it, but one of them is 
-                # just "down", which does not correspond to colours, we subtracted one to indicate completion.
-                if len(down_colours) == sum("down" in c for c in cols) - 1:
-                    self.targets["down_colours"] = torch.tensor(down_colours)
-            # For all other attributes.
-            else:
-                self.targets[col] = torch.tensor(int(attributes[col].item()))
+            try:
+                if col == "age":
+                    age_list = [0] * 4
+                    age_list[int(attributes[col].item()) - 1] = 1
+                    self.targets[col] = torch.Tensor(age_list)
+                # Grouping the up colors together since they are mutually exclusive
+                elif "up" in col and col != "up":
+                    #print(attributes[col])
+                    up_colours.append(int(attributes[col].item()))
+                    # Since there are 9 attributes that contain "up" in it, but one of them is 
+                    # just "up", which does not correspond to colours, we subtracted one to indicate completion.
+                    if len(up_colours) == sum("up" in c for c in cols) - 1:
+                        self.targets["up_colours"] = torch.tensor(up_colours)
+                # Grouping the down colors together since they are mutually exclusive
+                elif "down" in col and col != "down":
+                    down_colours.append(int(attributes[col].item()))
+                    # Since there are 9 attributes that contain "down" in it, but one of them is 
+                    # just "down", which does not correspond to colours, we subtracted one to indicate completion.
+                    if len(down_colours) == sum("down" in c for c in cols) - 1:
+                        self.targets["down_colours"] = torch.tensor(down_colours)
+                # For all other attributes.
+                else:
+                    self.targets[col] = torch.tensor(int(attributes[col].item()))
+            except: 
+                continue
+        img = F.to_tensor(img)
         return (img, self.targets)
 
     # Need a view_sample method
@@ -102,7 +129,6 @@ class MarketDataset(object):
         plt.imshow(img)
         plt.show()
         print(attr_map)
-        img = F.to_tensor(img)
         return (img, attr_map)
 
 if __name__ == "__main__":
