@@ -72,11 +72,13 @@ if __name__ == "__main__":
     config = confuse.Configuration('market1501', __name__)
     config.set_file(Path(
         r"C:\\Users\\netra\\GithubEncm369\\reid\\explainable-id-reid\\src\\dataset_util\\market1501.yml"))
-    from processor import MarketDataset
+    from dataset_util.processor import MarketDataset
     test_obj = MarketDataset(
-        config['market_1501_ds']['test_path'].get(), True, False)
+        config['market_1501_ds']['test_path'].get(), True, 2)
     train_obj = MarketDataset(
-        config['market_1501_ds']['train_path'].get(), True, True)
+        config['market_1501_ds']['train_path'].get(), True, 0)
+    validate_obj = MarketDataset(
+        config['market_1501_ds']['train_path'].get(), True, 1)
 
     bad = 0
     good = 0
@@ -86,6 +88,9 @@ if __name__ == "__main__":
     torch_ds_train = torch.utils.data.DataLoader(train_obj,
                                                  batch_size=2, num_workers=8,
                                                  collate_fn=collate_fn)
+    torch_ds_val = torch.utils.data.DataLoader(validate_obj,
+                                               batch_size=2, num_workers=8,
+                                               collate_fn=collate_fn)
 
     attr_train = []
     count = 0
@@ -99,11 +104,17 @@ if __name__ == "__main__":
         attr_train.append(attr)
         count += 1
     print(f"Count of train: {count}")
-    print(attr_train[1])
-    print(attr_train[2])
+    count = 0
+    validate_data = iter(torch_ds_val)
+    for img, attr in validate_data:
+        attr_train.append(attr)
+        count += 1
+    print(f"Count of validate: {count}")
+    # print(attr_train[1])
+    # print(attr_train[2])
     unmatched_item = set(attr_train[1][0].items()) ^ set(
         attr_train[1][1].items())
-    print(unmatched_item)
+    # print(unmatched_item)
     trainimg = np.true_divide(trainimg, 255)
     backbone = resnet_fpn_backbone(
         'resnet50', pretrained=True, trainable_layers=3)
@@ -112,7 +123,7 @@ if __name__ == "__main__":
     print("THIS: ", trainimg.shape)
 
     #trainimg_np = trainimg_np.unsqueeze(3)
-    #trainimg_np = torch.reshape(trainimg, (64, 3, 128, 1))
+    # trainimg_np = torch.reshape(trainimg, (64, 3, 128, 1))cd
     trainimg_np = trainimg.to(torch.double)
     out = backbone(trainimg_np.float())
     print(trainimg_np.shape)

@@ -11,38 +11,40 @@ from pathlib import Path
 from torchvision.transforms import functional as F
 import traceback
 
+
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
+config = confuse.Configuration('market1501', __name__)
+config.set_file(Path(
+    r"C:\\Users\\netra\\GithubEncm369\\reid\\explainable-id-reid\\src\\dataset_util\\market1501.yml"))
 
 
 class MarketDataset(object):
-    def __init__(self, root_path, image, train):
+    # the modes are:
+    # 0 - train
+    # 1 - validate
+    # 2 - test
+    def __init__(self, root_path, image, mode):
         self.paths = []
-        config = confuse.Configuration('market1501', __name__)
-        config.set_file(Path(
-            r"C:\\Users\\netra\\GithubEncm369\\reid\\explainable-id-reid\\src\\dataset_util\\market1501.yml"))
-        self.train = train
+        self.mode = mode
         self.root_path = root_path
         self.attribute_market = self.load_mats(
-            config['market_1501_ds']['att_path'].get(), train)
+            config['market_1501_ds']['att_path'].get(), mode)
+        # The second parameter in add_path is 0 for images, 1 for .mat files
         if image is True:
             self.paths = self.add_path(root_path, 0)
         else:
             self.paths = self.add_path(root_path, 1)
 
     def __len__(self):
-        if self.train is True:
-            print(len(list(os.listdir(self.root_path))) - 1)
-            return len(list(os.listdir(self.root_path))) - 1
-        else:
-            print(len(list(os.listdir(self.root_path))))
-            return len(list(os.listdir(self.root_path))) - 6677
+        print(len(self.paths))
+        return len(self.paths)
 
-    def load_mats(self, file_name, train):
+    def load_mats(self, file_name, mode):
         mat = loadmat(file_name)
-        if train is True:
+        if mode == 0 or mode == 1:
             df = pd.DataFrame.from_records(
                 mat["market_attribute"]["train"][0][0][0])
-        elif train is False:
+        elif mode == 2:
             df = pd.DataFrame.from_records(
                 mat["market_attribute"]["test"][0][0][0])
         map = {}
@@ -61,10 +63,21 @@ class MarketDataset(object):
 
     def add_path(self, path, type):
         file_paths = []
+        temp_count = 0
         for file in os.listdir(path):
             if type == 0:
                 if file[-4:] == ".jpg":
-                    file_paths.append(os.path.join(path, file))
+                    # For validation, indexes from 0002 to 0199 (100 identities) are used.
+                    # Everything else is used for training (0201 onwards).
+                    if self.mode == 0:
+                        if int(file[0:4]) > 199:
+                            file_paths.append(os.path.join(path, file))
+                    elif self.mode == 1:
+                        if int(file[0:4]) <= 199:
+                            file_paths.append(os.path.join(path, file))
+                    elif self.mode == 2:
+                        if file[0:2] != "-1" and file[0:4] != "0000":
+                            file_paths.append(os.path.join(path, file))
             elif type == 1:
                 if file[-4:] == ".mat":
                     file_paths.append(os.path.join(path, file))
@@ -83,6 +96,8 @@ class MarketDataset(object):
         for col in cols:
             # No need to include image_index
             if col == "image_index":
+                if self.mode == 1:
+                    print(attributes[col].item())
                 continue
             # Creating a one-hot encoded for age
             try:
@@ -121,7 +136,6 @@ class MarketDataset(object):
         plt.imshow(img)
         plt.show()
         print(attr_map)
-        img = F.to_tensor(img)
         return (img, attr_map)
 
 
@@ -133,5 +147,5 @@ if __name__ == "__main__":
         config['market_1501_ds']['test_path'].get(), True, False)
     train_obj = MarketDataset(
         config['market_1501_ds']['train_path'].get(), True, True)
-    test_obj.view_sample(14560)
-    train_obj.view_sample(10560)
+    test_obj.view_sample(12000)
+    train_obj.view_sample(12000)
