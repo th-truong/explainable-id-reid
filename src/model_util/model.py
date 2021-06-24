@@ -7,6 +7,20 @@ from pathlib import Path
 import torch
 import numpy as np
 import torch.nn as nn
+import torch.optim as optim
+
+class OverallModel(nn.Module):
+    def __init__(self, backbone, classifier, output_to_use):
+        super(OverallModel, self).__init__()
+        self.backbone = backbone
+        self.classifier = classifier
+        self.output_to_use = output_to_use
+
+    def forward(self, input, targets):
+        back_out = self.backbone(input)
+        output = self.classifier(back_out, self.output_to_use)
+
+        return output, targets
 
 class Classifier(nn.Module):
     # configurable, default activation layer is ReLU, but can be changed. Default setting for dropout
@@ -86,30 +100,63 @@ if __name__ == "__main__":
                                            batch_size=2, num_workers=8,
                                            collate_fn=collate_fn)
 
-    attr_train = []
-    count = 0
     test_data = iter(torch_ds_test)
-    for img, attr in test_data:
-        count += 1
-    print(f"Count of test: {count}")
+    print(f"Count of test: {len(test_data)}")
     train_data = iter(torch_ds_train)
-    count = 0
-    for img, attr in train_data:
-        attr_train.append(attr)
-        count += 1
-    print(f"Count of train: {count}")
-    count = 0
+    print(f"Count of train: {len(train_data)}")
     validate_data = iter(torch_ds_val)
-    for img, attr in validate_data:
-        attr_train.append(attr)
-        count += 1
-    print(f"Count of validate: {count}")
-    #print(attr_train[1])
-    #print(attr_train[2])
-    unmatched_item = set(attr_train[1][0].items()) ^ set(attr_train[1][1].items())
-    #print(unmatched_item)
-    trainimg = np.true_divide(trainimg, 255)
-    backbone = resnet_fpn_backbone('resnet50', pretrained=True, trainable_layers=3)
+    imgs = []
+    attrs = []
+    for img, attr in train_data:
+        imgs.append(img)
+        attrs.append(attr)
+        break
+    print(f"Count of validate: {len(validate_data)}")
+    #print(imgs[1][1].shape)
+
+    ####TESTING HERE
+    backbone = resnet_fpn_backbone('resnet50', pretrained=True, trainable_layers=0)
+    cfg = confuse.Configuration('model_architecture', __name__, read= False)
+    cfg.set_file("C:\\Users\\Div\\Desktop\\Research\\reid\\reid\\explainable-id-reid\\src\\model_util\\classifier_architecture.yml")
+    classifier_params = cfg.get()
+    # The second argument is the output being used as a String,
+    # "1", "2", "3", or "pool"
+    obj = Classifier(classifier_params, "3")
+
+    model = OverallModel(backbone, obj, "3")
+
+    device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+
+    print(imgs[0][0].shape)
+    out = model.forward(imgs[0], attrs[0])
+    print(out)
+    criteria = nn.CrossEntropyLoss()
+    # BINARY = bceloss
+    optimizer = optim.SGD(obj.parameters(), lr=0.001, momentum=0.9)
+    epochs = 20
+    for i in range(epochs):
+        for data in iter(torch_ds_train):
+            # get the inputs; data is a list of [inputs, labels]
+            inputs, labels = data
+            optimizer.zero_grad()
+            # This doesn't work because inputs is a tuple.
+            images = list(image.to(device) for image in inputs)
+            targets = [{k: v.to(device) for k, v in t.items()} for t in labels]
+            outputs = backbone(inputs)
+            a = obj.forward(outputs['3'])
+            loss = criteria(a, labels)
+            loss.backward()
+            optimizer.step()
+        torch.save({'model': obj.state_dict(),
+                    'optimizer': optimizer.state_dict()
+                    }, str(i).zfill(3) + "resnet50_fpn_frcnn_full.tar")
+
+
+#images = list(image.to(device) for image in images)
+#            targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
+
+    print('Finished Training')
+
     #trainimg_np = torch.from_numpy(trainimg).type('torch.DoubleTensor')
     #trainimg_np = torch.as_tensor(trainimg_np).type('torch.DoubleTensor')
     print("THIS: ", trainimg.shape)

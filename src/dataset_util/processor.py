@@ -33,7 +33,6 @@ class MarketDataset(object):
             self.paths = self.add_path(root_path, 1)
 
     def __len__(self):
-        print(len(self.paths))
         return len(self.paths)
 
     def load_mats(self, file_name, mode):
@@ -126,8 +125,9 @@ class MarketDataset(object):
     # Need a view_sample method
     def view_sample(self, idx):
         img, attr_map = self.__getitem__(idx)
-        plt.imshow(img)
-        plt.show()
+        #plt.imshow(img)
+        #plt.show()
+        print(img)
         print(attr_map)
         return (img, attr_map)
 
@@ -135,9 +135,9 @@ if __name__ == "__main__":
     config = confuse.Configuration('market1501', __name__)
     config.set_file(Path(r"C:\\Users\\Div\\Desktop\\Research\\reid\\reid\\explainable-id-reid\\src\\dataset_util\\market1501.yml"))
     test_obj = MarketDataset(
-        config['market_1501_ds']['test_path'].get(), True, False)
+        config['market_1501_ds']['test_path'].get(), True, 2)
     train_obj = MarketDataset(
-        config['market_1501_ds']['train_path'].get(), True, True)
+        config['market_1501_ds']['train_path'].get(), True, 0)
 
-    test_obj.view_sample(14560)
+    test_obj.view_sample(10560)
     train_obj.view_sample(10560)
