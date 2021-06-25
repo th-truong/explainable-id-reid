@@ -8,6 +8,9 @@ import torch
 import numpy as np
 import torch.nn as nn
 import torch.optim as optim
+from tqdm import tqdm
+
+torch.autograd.set_detect_anomaly(True)
 
 class OverallModel(nn.Module):
     def __init__(self, backbone, classifier, output_to_use):
@@ -18,8 +21,7 @@ class OverallModel(nn.Module):
 
     def forward(self, input, targets):
         back_out = self.backbone(input)
-        output = self.classifier(back_out, self.output_to_use)
-
+        output = self.classifier(back_out[self.output_to_use])
         return output
 
 class Classifier(nn.Module):
@@ -34,11 +36,11 @@ class Classifier(nn.Module):
             if layer['type'] == 'linear':
                 if linear_counter == 0:
                     if backbone_output == "1":
-                        layer['kwargs']['in_features'] = 4096
+                        layer['kwargs']['in_features'] = 32768
                     elif backbone_output == "2":
-                        layer['kwargs']['in_features'] = 2048
+                        layer['kwargs']['in_features'] = 8192
                     elif backbone_output == "3":
-                        layer['kwargs']['in_features'] = 1024
+                        layer['kwargs']['in_features'] = 2048
                     elif backbone_output == "pool":
                         layer['kwargs']['in_features'] = 512
                 self.layers.append(nn.Linear(**layer['kwargs']))
@@ -52,22 +54,24 @@ class Classifier(nn.Module):
     def attribute_classifier(self, classifier_params):
         layers_to_add = classifier_params["attribute_classification_layers"]
         self.attribute_layers_dict = {}
+        activation = None
         for layer in layers_to_add:
             if layer['type'] == 'linear':
                 linear = nn.Linear(**layer['kwargs'])
-                if layer['activation'] == 'softmax':
-                    activation = nn.Softmax(dim = None)
-                elif layer['activation'] == 'sigmoid':
-                    activation = nn.Sigmoid()
+            if layer['activation'] == 'softmax':
+                activation = nn.Softmax(dim = None)
+            elif layer['activation'] == 'sigmoid':
+                activation = nn.Sigmoid()
+            if activation == None:
+                self.attribute_layers_dict[layer['attribute']] = nn.Sequential(linear)
+            else:
                 self.attribute_layers_dict[layer['attribute']] = nn.Sequential(linear, activation)
-        print(self.attribute_layers_dict)
 
     def forward(self, backbone_output):
         x = backbone_output
         x = torch.flatten(x, start_dim = 1)
         for layer in self.layers:
             x = layer(x)
-        print(x.shape)
 
         attribute_predictions = {}
         for attr_key in list(self.attribute_layers_dict.keys()):
@@ -79,15 +83,30 @@ def collate_fn(batch):
 
 def training_loop(torch_ds, optimizer, device, model, loss, epochs = 20):
     for i in range(epochs):
-        for data in iter(torch_ds):
+        for data in tqdm(iter(torch_ds)):
             # get the inputs; data is a list of [inputs, labels]
             inputs, labels = data
             optimizer.zero_grad()
-            # This doesn't work because inputs is a tuple.
             images = list(image.to(device) for image in inputs)
             targets = [{k: v.to(device) for k, v in t.items()} for t in labels]
-            output = model.forward(images[0], targets[0])
-            loss = criteria(output, targets[0])
+            images = torch.stack(images)
+            output = model(images, targets)
+            loss = 0
+            for attr in output:
+                if attr == "age" or attr == "up_colours" or attr == "down_colours":
+                    loss_fn = nn.CrossEntropyLoss()
+                    out = output[attr]
+                    out = out.to(torch.float32)
+                    target = torch.stack((targets[0][attr], targets[1][attr]))
+                    target = target.to(torch.long)
+                    loss += loss_fn(out, target)
+                else:
+                    loss_fn = nn.BCELoss()
+                    out = output[attr]
+                    out = out.to(torch.float32)
+                    target = torch.stack((targets[0][attr], targets[1][attr])).view(2,1)
+                    target = target.to(torch.float32)
+                    loss += loss_fn(out, target)
             loss.backward()
             optimizer.step()
         torch.save({'model': obj.state_dict(),
@@ -100,11 +119,11 @@ if __name__ == "__main__":
     config.set_file(Path(r"C:\\Users\\Div\\Desktop\\Research\\reid\\reid\\explainable-id-reid\\src\\dataset_util\\market1501.yml"))
     from processor import MarketDataset
     test_obj = MarketDataset(
-        config['market_1501_ds']['test_path'].get(), True, 2)
+        config['market_1501_ds']['test_path'].get(), True, 2, False)
     train_obj = MarketDataset(
-        config['market_1501_ds']['train_path'].get(), True, 0)
+        config['market_1501_ds']['train_path'].get(), True, 0, False)
     validate_obj = MarketDataset(
-        config['market_1501_ds']['train_path'].get(), True, 1)
+        config['market_1501_ds']['train_path'].get(), True, 1, False)
 
     torch_ds_test = torch.utils.data.DataLoader(test_obj,
                                            batch_size=2, num_workers=8,
@@ -122,7 +141,6 @@ if __name__ == "__main__":
     print(f"Count of train: {len(train_data)}")
     validate_data = iter(torch_ds_val)
     print(f"Count of validate: {len(validate_data)}")
-    #print(imgs[1][1].shape)
 
     # Parameters for loop:
     backbone = resnet_fpn_backbone('resnet50', pretrained=True, trainable_layers=0)
@@ -133,35 +151,12 @@ if __name__ == "__main__":
     # "1", "2", "3", or "pool"
     obj = Classifier(classifier_params, "3")
     model = OverallModel(backbone, obj, "3")
+    model = model.train()
+    children = list(model.children())
     criteria = nn.CrossEntropyLoss()
     optimizer = optim.SGD(obj.parameters(), lr=0.001, momentum=0.9)
     epochs = 20
     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
     training_loop(torch_ds_train, optimizer, device, model, criteria, epochs)
 
-
-
-
-
-    #print(imgs[0][0].shape)
-    #out = model.forward(imgs[0], attrs[0])
-    #print(out)
-    #criteria = nn.CrossEntropyLoss()
-    # BINARY = bceloss
-
-    #images = list(image.to(device) for image in images)
-    #targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
-
     print('Finished Training')
-
-    #trainimg_np = torch.from_numpy(trainimg).type('torch.DoubleTensor')
-    #trainimg_np = torch.as_tensor(trainimg_np).type('torch.DoubleTensor')
-    #print("THIS: ", trainimg.shape)
-
-    #trainimg_np = trainimg_np.unsqueeze(3)
-    #trainimg_np = torch.reshape(trainimg, (64, 3, 128, 1))
-    #trainimg_np = trainimg.to(torch.double)
-    #out = backbone(trainimg_np.float())
-    #print(trainimg_np.shape)
-    ##print([(k, v.shape) for k, v in out.items()])
-    #print(out['2'].shape)

@@ -18,10 +18,11 @@ class MarketDataset(object):
     # 0 - train
     # 1 - validate
     # 2 - test
-    def __init__(self, root_path, image, mode):
+    def __init__(self, root_path, image, mode, one_hot_encoded):
         self.paths = []
         self.mode = mode
         self.root_path = root_path
+        self.one_hot = one_hot_encoded
         self.attribute_market = self.load_mats(
             config['market_1501_ds']['att_path'].get(), mode)
 
@@ -93,12 +94,15 @@ class MarketDataset(object):
             # No need to include image_index
             if col == "image_index":
                 continue
-            # Creating a one-hot encoded for age
             try:
                 if col == "age":
-                    age_list = [0] * 4
-                    age_list[int(attributes[col].item()) - 1] = 1
-                    self.targets[col] = torch.Tensor(age_list)
+                    # Creating a one-hot encoded for age
+                    if self.one_hot == True:
+                        age_list = [0] * 4
+                        age_list[int(attributes[col].item()) - 1] = 1
+                        self.targets[col] = torch.Tensor(age_list)
+                    else:
+                        self.targets[col] = torch.tensor(int(attributes[col].item() - 1))
                 # Grouping the up colors together since they are mutually exclusive
                 elif "up" in col and col != "up":
                     #print(attributes[col])
@@ -106,14 +110,20 @@ class MarketDataset(object):
                     # Since there are 9 attributes that contain "up" in it, but one of them is 
                     # just "up", which does not correspond to colours, we subtracted one to indicate completion.
                     if len(up_colours) == sum("up" in c for c in cols) - 1:
-                        self.targets["up_colours"] = torch.tensor(up_colours)
+                        if self.one_hot == True:
+                            self.targets["up_colours"] = torch.tensor(up_colours)
+                        else:
+                            self.targets["up_colours"] = torch.tensor(up_colours.index(1))
                 # Grouping the down colors together since they are mutually exclusive
                 elif "down" in col and col != "down":
                     down_colours.append(int(attributes[col].item()))
                     # Since there are 9 attributes that contain "down" in it, but one of them is 
                     # just "down", which does not correspond to colours, we subtracted one to indicate completion.
                     if len(down_colours) == sum("down" in c for c in cols) - 1:
-                        self.targets["down_colours"] = torch.tensor(down_colours)
+                        if self.one_hot == True:
+                            self.targets["down_colours"] = torch.tensor(down_colours)
+                        else:
+                            self.targets["down_colours"] = torch.tensor(down_colours.index(1))
                 # For all other attributes.
                 else:
                     self.targets[col] = torch.tensor(int(attributes[col].item()))
@@ -122,22 +132,17 @@ class MarketDataset(object):
         img = F.to_tensor(img)
         return (img, self.targets)
 
-    # Need a view_sample method
     def view_sample(self, idx):
         img, attr_map = self.__getitem__(idx)
-        #plt.imshow(img)
-        #plt.show()
-        print(img)
-        print(attr_map)
         return (img, attr_map)
 
 if __name__ == "__main__":
     config = confuse.Configuration('market1501', __name__)
     config.set_file(Path(r"C:\\Users\\Div\\Desktop\\Research\\reid\\reid\\explainable-id-reid\\src\\dataset_util\\market1501.yml"))
     test_obj = MarketDataset(
-        config['market_1501_ds']['test_path'].get(), True, 2)
+        config['market_1501_ds']['test_path'].get(), True, 2, False)
     train_obj = MarketDataset(
-        config['market_1501_ds']['train_path'].get(), True, 0)
+        config['market_1501_ds']['train_path'].get(), True, 0, False)
 
     test_obj.view_sample(10560)
     train_obj.view_sample(10560)

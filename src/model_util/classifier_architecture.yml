@@ -11,7 +11,7 @@ hidden_layers:
       bias: true
   - type: relu_activation
     kwargs:
-      inplace: true
+      inplace: false
   - type: dropout
     kwargs:
       p: 0.5
@@ -24,7 +24,7 @@ hidden_layers:
       bias: true
   - type: relu_activation
     kwargs:
-      inplace: true
+      inplace: false
   - type: dropout
     kwargs:
       p: 0.5
@@ -37,7 +37,7 @@ hidden_layers:
       bias: true
   - type: relu_activation
     kwargs:
-      inplace: true
+      inplace: false
   - type: dropout
     kwargs:
       p: 0.5
@@ -50,7 +50,7 @@ hidden_layers:
       bias: true
   - type: relu_activation
     kwargs:
-      inplace: true
+      inplace: false
 
   - type: linear
     kwargs:
@@ -61,7 +61,7 @@ hidden_layers:
 attribute_classification_layers:
   - type: linear
     attribute: age
-    activation: softmax
+    activation: none
     kwargs:
       in_features: 256
       out_features: 4
@@ -101,7 +101,7 @@ attribute_classification_layers:
 
   - type: linear
     attribute: down_colours
-    activation: softmax
+    activation: none
     kwargs:
       in_features: 256
       out_features: 9
@@ -149,7 +149,7 @@ attribute_classification_layers:
 
   - type: linear
     attribute: up_colours
-    activation: softmax
+    activation: none
     kwargs:
       in_features: 256
       out_features: 8
