@@ -7,6 +7,23 @@ from pathlib import Path
 import torch
 import numpy as np
 import torch.nn as nn
+import torch.optim as optim
+from tqdm import tqdm
+
+torch.autograd.set_detect_anomaly(True)
+
+
+class OverallModel(nn.Module):
+    def __init__(self, backbone, classifier, output_to_use):
+        super(OverallModel, self).__init__()
+        self.backbone = backbone
+        self.classifier = classifier
+        self.output_to_use = output_to_use
+
+    def forward(self, input, targets):
+        back_out = self.backbone(input)
+        output = self.classifier(back_out[self.output_to_use])
+        return output
 
 
 class Classifier(nn.Module):
@@ -21,11 +38,11 @@ class Classifier(nn.Module):
             if layer['type'] == 'linear':
                 if linear_counter == 0:
                     if backbone_output == "1":
-                        layer['kwargs']['in_features'] = 4096
+                        layer['kwargs']['in_features'] = 32768
                     elif backbone_output == "2":
-                        layer['kwargs']['in_features'] = 2048
+                        layer['kwargs']['in_features'] = 8192
                     elif backbone_output == "3":
-                        layer['kwargs']['in_features'] = 1024
+                        layer['kwargs']['in_features'] = 2048
                     elif backbone_output == "pool":
                         layer['kwargs']['in_features'] = 512
                 self.layers.append(nn.Linear(**layer['kwargs']))
@@ -39,23 +56,26 @@ class Classifier(nn.Module):
     def attribute_classifier(self, classifier_params):
         layers_to_add = classifier_params["attribute_classification_layers"]
         self.attribute_layers_dict = {}
+        activation = None
         for layer in layers_to_add:
             if layer['type'] == 'linear':
                 linear = nn.Linear(**layer['kwargs'])
-                if layer['activation'] == 'softmax':
-                    activation = nn.Softmax(dim=None)
-                elif layer['activation'] == 'sigmoid':
-                    activation = nn.Sigmoid()
+            if layer['activation'] == 'softmax':
+                activation = nn.Softmax(dim=None)
+            elif layer['activation'] == 'sigmoid':
+                activation = nn.Sigmoid()
+            if activation == None:
+                self.attribute_layers_dict[layer['attribute']] = nn.Sequential(
+                    linear)
+            else:
                 self.attribute_layers_dict[layer['attribute']] = nn.Sequential(
                     linear, activation)
-        print(self.attribute_layers_dict)
 
     def forward(self, backbone_output):
         x = backbone_output
         x = torch.flatten(x, start_dim=1)
         for layer in self.layers:
             x = layer(x)
-        print(x.shape)
 
         attribute_predictions = {}
         for attr_key in list(self.attribute_layers_dict.keys()):
@@ -68,20 +88,52 @@ def collate_fn(batch):
     return tuple(zip(*batch))
 
 
+def training_loop(torch_ds, optimizer, device, model, loss, epochs=20):
+    for i in range(epochs):
+        for data in tqdm(iter(torch_ds)):
+            # get the inputs; data is a list of [inputs, labels]
+            inputs, labels = data
+            optimizer.zero_grad()
+            images = list(image.to(device) for image in inputs)
+            targets = [{k: v.to(device) for k, v in t.items()} for t in labels]
+            images = torch.stack(images)
+            output = model(images, targets)
+            loss = 0
+            for attr in output:
+                if attr == "age" or attr == "up_colours" or attr == "down_colours":
+                    loss_fn = nn.CrossEntropyLoss()
+                    out = output[attr]
+                    out = out.to(torch.float32)
+                    target = torch.stack((targets[0][attr], targets[1][attr]))
+                    target = target.to(torch.long)
+                    loss += loss_fn(out, target)
+                else:
+                    loss_fn = nn.BCELoss()
+                    out = output[attr]
+                    out = out.to(torch.float32)
+                    target = torch.stack(
+                        (targets[0][attr], targets[1][attr])).view(2, 1)
+                    target = target.to(torch.float32)
+                    loss += loss_fn(out, target)
+            loss.backward()
+            optimizer.step()
+        torch.save({'model': obj.state_dict(),
+                    'optimizer': optimizer.state_dict()
+                    }, str(i).zfill(3) + "resnet50_fpn_frcnn_full.tar")
+
+
 if __name__ == "__main__":
     config = confuse.Configuration('market1501', __name__)
     config.set_file(Path(
         r"C:\\Users\\netra\\GithubEncm369\\reid\\explainable-id-reid\\src\\dataset_util\\market1501.yml"))
     from dataset_util.processor import MarketDataset
     test_obj = MarketDataset(
-        config['market_1501_ds']['test_path'].get(), True, 2)
+        config['market_1501_ds']['test_path'].get(), True, 2, False)
     train_obj = MarketDataset(
-        config['market_1501_ds']['train_path'].get(), True, 0)
+        config['market_1501_ds']['train_path'].get(), True, 0, False)
     validate_obj = MarketDataset(
-        config['market_1501_ds']['train_path'].get(), True, 1)
+        config['market_1501_ds']['train_path'].get(), True, 1, False)
 
-    bad = 0
-    good = 0
     torch_ds_test = torch.utils.data.DataLoader(test_obj,
                                                 batch_size=2, num_workers=8,
                                                 collate_fn=collate_fn)
@@ -92,51 +144,31 @@ if __name__ == "__main__":
                                                batch_size=2, num_workers=8,
                                                collate_fn=collate_fn)
 
-    attr_train = []
-    count = 0
     test_data = iter(torch_ds_test)
-    for img, attr in test_data:
-        count += 1
-    print(f"Count of test: {count}")
+    print(f"Count of test: {len(test_data)}")
     train_data = iter(torch_ds_train)
-    count = 0
-    for img, attr in train_data:
-        attr_train.append(attr)
-        count += 1
-    print(f"Count of train: {count}")
-    count = 0
+    print(f"Count of train: {len(train_data)}")
     validate_data = iter(torch_ds_val)
-    for img, attr in validate_data:
-        attr_train.append(attr)
-        count += 1
-    print(f"Count of validate: {count}")
-    # print(attr_train[1])
-    # print(attr_train[2])
-    unmatched_item = set(attr_train[1][0].items()) ^ set(
-        attr_train[1][1].items())
-    # print(unmatched_item)
-    trainimg = np.true_divide(trainimg, 255)
+    print(f"Count of validate: {len(validate_data)}")
+
+    # Parameters for loop:
     backbone = resnet_fpn_backbone(
-        'resnet50', pretrained=True, trainable_layers=3)
-    #trainimg_np = torch.from_numpy(trainimg).type('torch.DoubleTensor')
-    #trainimg_np = torch.as_tensor(trainimg_np).type('torch.DoubleTensor')
-    print("THIS: ", trainimg.shape)
-
-    #trainimg_np = trainimg_np.unsqueeze(3)
-    # trainimg_np = torch.reshape(trainimg, (64, 3, 128, 1))cd
-    trainimg_np = trainimg.to(torch.double)
-    out = backbone(trainimg_np.float())
-    print(trainimg_np.shape)
-    print([(k, v.shape) for k, v in out.items()])
-    print(out['2'].shape)
-
-    print("\n\n\n\n\n\n\n\n\n\n\n")
+        'resnet50', pretrained=True, trainable_layers=0)
     cfg = confuse.Configuration('model_architecture', __name__, read=False)
     cfg.set_file(
         "C:\\Users\\netra\\GithubEncm369\\reid\\explainable-id-reid\\src\\model_util\\classifier_architecture.yml")
     classifier_params = cfg.get()
     # The second argument is the output being used as a String,
     # "1", "2", "3", or "pool"
-    obj = Classifier(classifier_params, "2")
-    a = obj.forward(out['2'])
-    print(a)
+    obj = Classifier(classifier_params, "3")
+    model = OverallModel(backbone, obj, "3")
+    model = model.train()
+    children = list(model.children())
+    criteria = nn.CrossEntropyLoss()
+    optimizer = optim.SGD(obj.parameters(), lr=0.001, momentum=0.9)
+    epochs = 20
+    device = torch.device(
+        'cuda') if torch.cuda.is_available() else torch.device('cpu')
+    training_loop(torch_ds_train, optimizer, device, model, criteria, epochs)
+
+    print('Finished Training')
