@@ -9,7 +9,11 @@ import numpy as np
 import torch.nn as nn
 import torch.optim as optim
 from tqdm import tqdm
+import torch
+from torch.utils.tensorboard import SummaryWriter
 
+import warnings
+warnings.simplefilter(action='ignore', category=FutureWarning)
 torch.autograd.set_detect_anomaly(True)
 
 class OverallModel(nn.Module):
@@ -81,6 +85,33 @@ class Classifier(nn.Module):
 def collate_fn(batch):
     return tuple(zip(*batch))
 
+writer = SummaryWriter()
+
+def validation_loop(validation_ds, device, model, loss):
+    for data in tqdm(iter(validation_ds)):
+        inputs, labels = data
+        images = list(image.to(device) for image in inputs)
+        targets = [{k: v.to(device) for k, v in t.items()} for t in labels]
+        images = torch.stack(images)
+        output = model(images, targets)
+        loss = 0    
+        for attr in output:
+            if attr == "age" or attr == "up_colours" or attr == "down_colours":
+                loss_fn = nn.CrossEntropyLoss()
+                out = output[attr]
+                out = out.to(torch.float32)
+                target = torch.stack((targets[0][attr], targets[1][attr]))
+                target = target.to(torch.long)
+                loss += loss_fn(out, target)
+            else:
+                loss_fn = nn.BCELoss()
+                out = output[attr]
+                out = out.to(torch.float32)
+                target = torch.stack((targets[0][attr], targets[1][attr])).view(2,1)
+                target = target.to(torch.float32)
+                loss += loss_fn(out, target)
+        writer.add_scalar("Validation Loss/train", loss, i) 
+
 def training_loop(torch_ds, optimizer, device, model, loss, epochs = 20):
     for i in range(epochs):
         for data in tqdm(iter(torch_ds)):
@@ -91,24 +122,33 @@ def training_loop(torch_ds, optimizer, device, model, loss, epochs = 20):
             targets = [{k: v.to(device) for k, v in t.items()} for t in labels]
             images = torch.stack(images)
             output = model(images, targets)
+            print("\n\n")
             loss = 0
             for attr in output:
                 if attr == "age" or attr == "up_colours" or attr == "down_colours":
                     loss_fn = nn.CrossEntropyLoss()
                     out = output[attr]
                     out = out.to(torch.float32)
-                    target = torch.stack((targets[0][attr], targets[1][attr]))
+                    try:
+                        target = torch.stack((targets[0][attr], targets[1][attr]))
+                    except:
+                        continue
                     target = target.to(torch.long)
-                    loss += loss_fn(out, target)
+                    local_loss = loss_fn(out, target)
+                    loss += local_loss
+                    writer.add_scalar(f"{attr} Loss/train", local_loss, i)
                 else:
                     loss_fn = nn.BCELoss()
                     out = output[attr]
                     out = out.to(torch.float32)
                     target = torch.stack((targets[0][attr], targets[1][attr])).view(2,1)
                     target = target.to(torch.float32)
-                    loss += loss_fn(out, target)
+                    local_loss = loss_fn(out, target)
+                    loss += local_loss
+                    writer.add_scalar(f"{attr} Loss/train", local_loss, i)
             loss.backward()
             optimizer.step()
+        
         torch.save({'model': obj.state_dict(),
                     'optimizer': optimizer.state_dict()
                     }, str(i).zfill(3) + "resnet50_fpn_frcnn_full.tar")
@@ -158,5 +198,6 @@ if __name__ == "__main__":
     epochs = 20
     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
     training_loop(torch_ds_train, optimizer, device, model, criteria, epochs)
-
+    
     print('Finished Training')
+    writer.flush()
