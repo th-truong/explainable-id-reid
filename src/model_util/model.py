@@ -123,32 +123,44 @@ def training_loop(torch_ds, optimizer, device, model, loss, epochs = 20):
             images = torch.stack(images)
             output = model(images, targets)
             print("\n\n")
-            loss = 0
+            loss = torch.zeros(0)
             for attr in output:
                 if attr == "age" or attr == "up_colours" or attr == "down_colours":
                     loss_fn = nn.CrossEntropyLoss()
                     out = output[attr]
                     out = out.to(torch.float32)
                     try:
-                        target = torch.stack((targets[0][attr], targets[1][attr]))
+                        if len(targets) >= 2:
+                            target = torch.stack((targets[0][attr], targets[1][attr]))
+                        else:
+                            target = torch.stack(targets[0][attr])
                     except:
                         continue
                     target = target.to(torch.long)
                     local_loss = loss_fn(out, target)
-                    loss += local_loss
+                    loss = torch.add(loss, local_loss)
                     writer.add_scalar(f"{attr} Loss/train", local_loss, i)
                 else:
                     loss_fn = nn.BCELoss()
                     out = output[attr]
                     out = out.to(torch.float32)
-                    target = torch.stack((targets[0][attr], targets[1][attr])).view(2,1)
+                    try:
+                        if len(targets) >= 2:
+                            target = torch.stack((targets[0][attr], targets[1][attr])).view(2,1)
+                        else:
+                            target = torch.stack(targets[0][attr]).view(2,1)
+                    except:
+                        continue
                     target = target.to(torch.float32)
                     local_loss = loss_fn(out, target)
-                    loss += local_loss
+                    loss = torch.add(loss, local_loss)
                     writer.add_scalar(f"{attr} Loss/train", local_loss, i)
-            loss.backward()
+            if loss.nelement() != 0:
+                loss.sum().backward()
+            else: 
+                continue
             optimizer.step()
-        
+        print("DONE")
         torch.save({'model': obj.state_dict(),
                     'optimizer': optimizer.state_dict()
                     }, str(i).zfill(3) + "resnet50_fpn_frcnn_full.tar")
@@ -178,6 +190,11 @@ if __name__ == "__main__":
     test_data = iter(torch_ds_test)
     print(f"Count of test: {len(test_data)}")
     train_data = iter(torch_ds_train)
+    attrs = []
+    for img, attr in torch_ds_train:
+        attrs.append(attr)
+    print(attrs[len(attrs) - 1])
+
     print(f"Count of train: {len(train_data)}")
     validate_data = iter(torch_ds_val)
     print(f"Count of validate: {len(validate_data)}")
