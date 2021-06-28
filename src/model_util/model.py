@@ -1,8 +1,8 @@
-from torchvision.models.detection.backbone_utils import resnet_fpn_backbone 
+from torchvision.models.detection.backbone_utils import resnet_fpn_backbone
 import torchvision
 import sys
 import os
-import confuse 
+import confuse
 from pathlib import Path
 import torch
 import numpy as np
@@ -17,6 +17,7 @@ import warnings
 warnings.simplefilter(action='ignore', category=FutureWarning)
 torch.autograd.set_detect_anomaly(True)
 
+
 class OverallModel(nn.Module):
     def __init__(self, backbone, classifier, output_to_use):
         super(OverallModel, self).__init__()
@@ -28,6 +29,7 @@ class OverallModel(nn.Module):
         back_out = self.backbone(input)
         output = self.classifier(back_out[self.output_to_use])
         return output
+
 
 class Classifier(nn.Module):
     # configurable, default activation layer is ReLU, but can be changed. Default setting for dropout
@@ -64,29 +66,35 @@ class Classifier(nn.Module):
             if layer['type'] == 'linear':
                 linear = nn.Linear(**layer['kwargs'])
             if layer['activation'] == 'softmax':
-                activation = nn.Softmax(dim = None)
+                activation = nn.Softmax(dim=None)
             elif layer['activation'] == 'sigmoid':
                 activation = nn.Sigmoid()
             if activation == None:
-                self.attribute_layers_dict[layer['attribute']] = nn.Sequential(linear)
+                self.attribute_layers_dict[layer['attribute']] = nn.Sequential(
+                    linear)
             else:
-                self.attribute_layers_dict[layer['attribute']] = nn.Sequential(linear, activation)
+                self.attribute_layers_dict[layer['attribute']] = nn.Sequential(
+                    linear, activation)
 
     def forward(self, backbone_output):
         x = backbone_output
-        x = torch.flatten(x, start_dim = 1)
+        x = torch.flatten(x, start_dim=1)
         for layer in self.layers:
             x = layer(x)
 
         attribute_predictions = {}
         for attr_key in list(self.attribute_layers_dict.keys()):
-            attribute_predictions[attr_key] = self.attribute_layers_dict[attr_key](x)
+            attribute_predictions[attr_key] = self.attribute_layers_dict[attr_key](
+                x)
         return attribute_predictions
+
 
 def collate_fn(batch):
     return tuple(zip(*batch))
 
+
 writer = SummaryWriter()
+
 
 def validation_loop(validation_ds, device, model, loss):
     with torch.no_grad():
@@ -104,7 +112,8 @@ def validation_loop(validation_ds, device, model, loss):
                     out = out.to(torch.float32)
                     try:
                         if len(targets) >= 2:
-                            target = torch.stack((targets[0][attr], targets[1][attr]))
+                            target = torch.stack(
+                                (targets[0][attr], targets[1][attr]))
                         else:
                             target = torch.stack(targets[0][attr])
                     except:
@@ -112,26 +121,31 @@ def validation_loop(validation_ds, device, model, loss):
                     target = target.to(torch.long)
                     local_loss = loss_fn(out, target)
                     loss = torch.add(loss, local_loss)
-                    precision, recall, fscore = precision_recall_fscore_support(target, out)
+                    precision, recall, fscore = precision_recall_fscore_support(
+                        target, out)
                 else:
                     loss_fn = nn.BCELoss()
                     out = output[attr]
                     out = out.to(torch.float32)
                     try:
                         if len(targets) >= 2:
-                            target = torch.stack((targets[0][attr], targets[1][attr])).view(2,1)
+                            target = torch.stack(
+                                (targets[0][attr], targets[1][attr])).view(2, 1)
                         else:
-                            target = torch.stack(targets[0][attr]).view(2,1)
+                            target = torch.stack(targets[0][attr]).view(2, 1)
                     except:
                         continue
                     target = target.to(torch.float32)
                     local_loss = loss_fn(out, target)
                     loss = torch.add(loss, local_loss)
-                    precision, recall, fscore = precision_recall_fscore_support(target, out)
-                writer.add_scalar(f"Validation {attr} precision, recall, fscore", precision, recall, fscore)
-            writer.add_scalar("Validation Loss/train", loss, i) 
+                    precision, recall, fscore = precision_recall_fscore_support(
+                        target, out)
+                writer.add_scalar(
+                    f"Validation {attr} precision, recall, fscore", precision, recall, fscore)
+            writer.add_scalar("Validation Loss/train", loss)
 
-def training_loop(torch_ds, validation_ds, optimizer, device, model, loss, epochs = 20):
+
+def training_loop(torch_ds, validation_ds, optimizer, device, model, loss, epochs=20):
     for i in range(epochs):
         for data in tqdm(iter(torch_ds)):
             # get the inputs; data is a list of [inputs, labels]
@@ -150,7 +164,8 @@ def training_loop(torch_ds, validation_ds, optimizer, device, model, loss, epoch
                     out = out.to(torch.float32)
                     try:
                         if len(targets) >= 2:
-                            target = torch.stack((targets[0][attr], targets[1][attr]))
+                            target = torch.stack(
+                                (targets[0][attr], targets[1][attr]))
                         else:
                             target = torch.stack(targets[0][attr])
                     except:
@@ -165,9 +180,10 @@ def training_loop(torch_ds, validation_ds, optimizer, device, model, loss, epoch
                     out = out.to(torch.float32)
                     try:
                         if len(targets) >= 2:
-                            target = torch.stack((targets[0][attr], targets[1][attr])).view(2,1)
+                            target = torch.stack(
+                                (targets[0][attr], targets[1][attr])).view(2, 1)
                         else:
-                            target = torch.stack(targets[0][attr]).view(2,1)
+                            target = torch.stack(targets[0][attr]).view(2, 1)
                     except:
                         continue
                     target = target.to(torch.float32)
@@ -176,7 +192,7 @@ def training_loop(torch_ds, validation_ds, optimizer, device, model, loss, epoch
                     writer.add_scalar(f"{attr} Loss/train", local_loss, i)
             if loss.nelement() != 0:
                 loss.sum().backward()
-            else: 
+            else:
                 continue
             optimizer.step()
         print("DONE")
@@ -188,7 +204,8 @@ def training_loop(torch_ds, validation_ds, optimizer, device, model, loss, epoch
 
 if __name__ == "__main__":
     config = confuse.Configuration('market1501', __name__)
-    config.set_file(Path(r"C:\\Users\\Div\\Desktop\\Research\\reid\\reid\\explainable-id-reid\\src\\dataset_util\\market1501.yml"))
+    config.set_file(Path(
+        r"C:\\Users\\Div\\Desktop\\Research\\reid\\reid\\explainable-id-reid\\src\\dataset_util\\market1501.yml"))
     from processor import MarketDataset
     test_obj = MarketDataset(
         config['market_1501_ds']['test_path'].get(), True, 2, False)
@@ -198,14 +215,14 @@ if __name__ == "__main__":
         config['market_1501_ds']['train_path'].get(), True, 1, False)
 
     torch_ds_test = torch.utils.data.DataLoader(test_obj,
-                                           batch_size=2, num_workers=8,
-                                           collate_fn=collate_fn)
+                                                batch_size=2, num_workers=8,
+                                                collate_fn=collate_fn)
     torch_ds_train = torch.utils.data.DataLoader(train_obj,
-                                           batch_size=2, num_workers=8,
-                                           collate_fn=collate_fn)
+                                                 batch_size=2, num_workers=8,
+                                                 collate_fn=collate_fn)
     torch_ds_val = torch.utils.data.DataLoader(validate_obj,
-                                           batch_size=2, num_workers=8,
-                                           collate_fn=collate_fn)
+                                               batch_size=2, num_workers=8,
+                                               collate_fn=collate_fn)
 
     test_data = iter(torch_ds_test)
     print(f"Count of test: {len(test_data)}")
@@ -220,9 +237,11 @@ if __name__ == "__main__":
     print(f"Count of validate: {len(validate_data)}")
 
     # Parameters for loop:
-    backbone = resnet_fpn_backbone('resnet50', pretrained=True, trainable_layers=0)
-    cfg = confuse.Configuration('model_architecture', __name__, read= False)
-    cfg.set_file("C:\\Users\\Div\\Desktop\\Research\\reid\\reid\\explainable-id-reid\\src\\model_util\\classifier_architecture.yml")
+    backbone = resnet_fpn_backbone(
+        'resnet50', pretrained=True, trainable_layers=0)
+    cfg = confuse.Configuration('model_architecture', __name__, read=False)
+    cfg.set_file(
+        "C:\\Users\\Div\\Desktop\\Research\\reid\\reid\\explainable-id-reid\\src\\model_util\\classifier_architecture.yml")
     classifier_params = cfg.get()
     # The second argument is the output being used as a String,
     # "1", "2", "3", or "pool"
@@ -233,8 +252,10 @@ if __name__ == "__main__":
     criteria = nn.CrossEntropyLoss()
     optimizer = optim.SGD(obj.parameters(), lr=0.001, momentum=0.9)
     epochs = 20
-    device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
-    training_loop(torch_ds_train, torch_ds_val, optimizer, device, model, criteria, epochs)
-    
+    device = torch.device(
+        'cuda') if torch.cuda.is_available() else torch.device('cpu')
+    training_loop(torch_ds_train, torch_ds_val, optimizer,
+                  device, model, criteria, epochs)
+
     print('Finished Training')
     writer.flush()
