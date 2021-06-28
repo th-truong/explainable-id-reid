@@ -30,4 +30,4 @@ From: ubuntu:18.04
     python3 -m pip install torch torchvision numpy matplotlib torchsummary tensorboardX \
     scikit-learn os pandas scikit-image scipy.io opencv-python pylint matplotlib.pyplot \
     PIL sys pathlib torchvision.transforms traceback torchvision.models.detection.backbone_utils\
-    confuse torch.nn torch.optim
+    confuse torch.nn torch.optim torch.utils.tensorboard sklearn.metrics tqdm
