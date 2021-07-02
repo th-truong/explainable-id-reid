@@ -157,6 +157,7 @@ def validation_loop(validation_ds, device, model, loss):
                 #writer.add_scalar(f"Validation {attr} recall", recall)
                 #writer.add_scalar(f"Validation {attr} f_beta score", fscore)
             for i, val in enumerate(loss):
+                print("Validation Loss/train", val, global_step = i)
                 writer.add_scalar("Validation Loss/train", val, global_step = i)
                 print(val, global_step)
 
@@ -190,6 +191,7 @@ def training_loop(torch_ds, validation_ds, optimizer, device, model, loss, epoch
                     target = target.to(torch.long)
                     local_loss = loss_fn(out, target)
                     loss = torch.add(loss, local_loss)
+                    print(f"{attr} Loss/train", local_loss, i)
                     writer.add_scalar(f"{attr} Loss/train", local_loss, i)
                     #writer.add_scalar(f"{attr} Predicted class and probability vs Real", torch.argmax(out).item(), torch.max(out).item(), target.item())
                 else:
@@ -206,6 +208,7 @@ def training_loop(torch_ds, validation_ds, optimizer, device, model, loss, epoch
                     target = target.to(torch.float32)
                     local_loss = loss_fn(out, target)
                     loss = torch.add(loss, local_loss)
+                    print(f"{attr} Loss/train", local_loss, i)
                     writer.add_scalar(f"{attr} Loss/train", local_loss, i)
             if loss.nelement() != 0:
                 loss.sum().backward()
@@ -269,7 +272,7 @@ if __name__ == "__main__":
     model = model.train()
     criteria = nn.CrossEntropyLoss()
     optimizer = optim.SGD(obj.parameters(), lr=0.001, momentum=0.9)
-    epochs = 2
+    epochs = 20
     device = torch.device(
         'cuda') if torch.cuda.is_available() else torch.device('cpu')
     training_loop(torch_ds_train, torch_ds_val, optimizer, device, model, criteria, epochs)
