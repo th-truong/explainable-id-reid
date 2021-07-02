@@ -104,7 +104,6 @@ class MarketDataset(object):
                     self.targets[col] = torch.tensor(int(attributes[col].item() - 1))
             # Grouping the up colors together since they are mutually exclusive
             elif "up" in col and col != "up":
-                #print(attributes[col])
                 up_colours.append(int(attributes[col].item()))
                 # Since there are 9 attributes that contain "up" in it, but one of them is 
                 # just "up", which does not correspond to colours, we subtracted one to indicate completion.

@@ -106,21 +106,22 @@ def validation_loop(validation_ds, device, model, loss):
             targets = [{k: v.to(device) for k, v in t.items()} for t in labels]
             images = torch.stack(images)
             output = model(images, targets)
-            print(output)
             loss = torch.zeros(0)
             for attr in output:
-                precision = 0
-                recall = 0
-                fscore = 0
+                #precision = 0
+                #recall = 0
+                #fscore = 0
                 if attr == "age" or attr == "up_colours" or attr == "down_colours":
                     if any(-1 in t[attr] for t in targets):
                         continue
                     loss_fn = nn.CrossEntropyLoss()
                     out = output[attr]
-                    print(out)
                     out = out.to(torch.float32)
                     if len(targets) >= 2:
-                        target = torch.stack(t[attr] for t in targets)
+                        target_list = []
+                        for t in targets:
+                            target_list.append(t[attr])
+                        target = torch.stack(tuple(target_list))
                     else:
                         target = targets[0][attr].view(1)
                     target = target.to(torch.long)
@@ -140,22 +141,21 @@ def validation_loop(validation_ds, device, model, loss):
                     out = output[attr]
                     out = out.to(torch.float32)
                     if len(targets) >= 2:
-                        target = torch.stack(t[attr] for t in targets)
+                        target_list = []
+                        for t in targets:
+                            target_list.append(t[attr])
+                        target = torch.stack(tuple(target_list)).view(out.shape)
                     else:
                         target = targets[0][attr].view(out.shape)
                     target = target.to(torch.float32)
                     local_loss = loss_fn(out, target)
                     loss = torch.add(loss, local_loss)
-                    print(target, out)
                     #precision, recall, fscore = precision_recall_fscore_support(
                     #    target, out)
-                writer.add_scalar(
-                    f"Validation {attr} precision", precision)
-                writer.add_scalar(f"Validation {attr} recall", recall)
-                writer.add_scalar(f"Validation {attr} f_beta score", fscore)
-                print(f"Precision: ", precision)
-                print(f"Recall: ", recall)
-                print(f"Fscore: ", fscore)
+                #writer.add_scalar(
+                #    f"Validation {attr} precision", precision)
+                #writer.add_scalar(f"Validation {attr} recall", recall)
+                #writer.add_scalar(f"Validation {attr} f_beta score", fscore)
             for i, val in enumerate(loss):
                 writer.add_scalar("Validation Loss/train", val, global_step = i)
                 print(val, global_step)
@@ -164,7 +164,6 @@ def validation_loop(validation_ds, device, model, loss):
 def training_loop(torch_ds, validation_ds, optimizer, device, model, loss, epochs=20):
     for i in range(epochs):
         for data in tqdm(iter(torch_ds)):
-            break
             # get the inputs; data is a list of [inputs, labels]
             inputs, labels = data
             optimizer.zero_grad()
@@ -182,22 +181,26 @@ def training_loop(torch_ds, validation_ds, optimizer, device, model, loss, epoch
                     out = output[attr]
                     out = out.to(torch.float32)
                     if len(targets) >= 2:
-                        target = torch.stack(t[attr] for t in targets)
+                        target_list = []
+                        for t in targets:
+                            target_list.append(t[attr])
+                        target = torch.stack(tuple(target_list))
                     else:
                         target = targets[0][attr].view(1)
                     target = target.to(torch.long)
                     local_loss = loss_fn(out, target)
-                    print(local_loss)
                     loss = torch.add(loss, local_loss)
                     writer.add_scalar(f"{attr} Loss/train", local_loss, i)
-                    writer.add_scalar(f"{attr} Predicted class and probability vs Real", torch.argmax(out).item(), torch.max(out).item(), target.item())
+                    #writer.add_scalar(f"{attr} Predicted class and probability vs Real", torch.argmax(out).item(), torch.max(out).item(), target.item())
                 else:
                     loss_fn = nn.BCELoss()
                     out = output[attr]
                     out = out.to(torch.float32)
                     if len(targets) >= 2:
-                        target = torch.stack(
-                            (t[attr] for t in targets).view(2,1))
+                        target_list = []
+                        for t in targets:
+                            target_list.append(t[attr])
+                        target = torch.stack(tuple(target_list)).view(out.shape)
                     else:
                         target = targets[0][attr].view(out.shape)
                     target = target.to(torch.float32)
@@ -211,7 +214,7 @@ def training_loop(torch_ds, validation_ds, optimizer, device, model, loss, epoch
             optimizer.step()
         print("DONE")
         validation_loop(validation_ds, device, model, loss)
-        torch.save({'model': obj.state_dict(),
+        torch.save({'model': model.state_dict(),
                     'optimizer': optimizer.state_dict()
                     }, str(i).zfill(3) + "resnet50_fpn_frcnn_full.tar")
     writer.flush()
@@ -231,13 +234,13 @@ if __name__ == "__main__":
         config['market_1501_ds']['train_path'].get(), True, 1, False)
 
     torch_ds_test = torch.utils.data.DataLoader(test_obj,
-                                                batch_size=1, num_workers=8,
+                                                batch_size=2, num_workers=8,
                                                 collate_fn=collate_fn)
     torch_ds_train = torch.utils.data.DataLoader(train_obj,
-                                                 batch_size=1, num_workers=8,
+                                                 batch_size=2, num_workers=8,
                                                  collate_fn=collate_fn)
     torch_ds_val = torch.utils.data.DataLoader(validate_obj,
-                                               batch_size=1, num_workers=8,
+                                               batch_size=2, num_workers=8,
                                                collate_fn=collate_fn)
 
     #test_data = iter(torch_ds_test)
@@ -264,12 +267,10 @@ if __name__ == "__main__":
     obj = Classifier(classifier_params, "3")
     model = OverallModel(backbone, obj, "3")
     model = model.train()
-    children = list(model.children())
     criteria = nn.CrossEntropyLoss()
     optimizer = optim.SGD(obj.parameters(), lr=0.001, momentum=0.9)
     epochs = 2
     device = torch.device(
         'cuda') if torch.cuda.is_available() else torch.device('cpu')
     training_loop(torch_ds_train, torch_ds_val, optimizer, device, model, criteria, epochs)
-
     print('Finished Training')
