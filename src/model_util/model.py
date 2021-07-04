@@ -16,6 +16,7 @@ from ignite.metrics import Precision
 
 import warnings
 warnings.simplefilter(action='ignore', category=FutureWarning)
+warnings.simplefilter(action='ignore', category=UserWarning)
 torch.autograd.set_detect_anomaly(True)
 
 
@@ -25,11 +26,61 @@ class OverallModel(nn.Module):
         self.backbone = backbone
         self.classifier = classifier
         self.output_to_use = output_to_use
+        self.loss_layers = nn.ModuleDict({'age': nn.CrossEntropyLoss(),
+                                          'backpack': nn.BCELoss(),
+                                          'bag': nn.BCELoss(),
+                                          'clothes': nn.BCELoss(),
+                                          'down': nn.BCELoss(),
+                                          'down_colours': nn.CrossEntropyLoss(),
+                                          'gender': nn.BCELoss(),
+                                          'hair': nn.BCELoss(),
+                                          'handbag': nn.BCELoss(),
+                                          'hat': nn.BCELoss(),
+                                          'up': nn.BCELoss(),
+                                          'up_colours': nn.CrossEntropyLoss()})
 
     def forward(self, input, targets):
         back_out = self.backbone(input)
         output = self.classifier(back_out[self.output_to_use])
-        return output
+        target_outputs = {}
+        if len(targets) >= 2:
+            for attr in targets[0].keys():
+                status = True
+                for idx in range(len(targets)):
+                    if attr not in targets[idx].keys():
+                        status = False
+                        break
+                if status == False:
+                    continue
+                target_list = []
+                if any(-1 in t[attr] for t in targets):
+                        continue
+                for index in range(len(targets)):
+                    target_list.append(targets[index][attr])
+                target_outputs[attr] = torch.stack(tuple(target_list))
+        else: 
+            target_outputs = targets[0]
+            for attr in target_outputs:
+                target_outputs[attr] = target_outputs[attr].view(1)
+            print(target_outputs)
+        output_dict = {}
+        if self.training:
+            for attribute in self.loss_layers.keys():
+                if attribute not in target_outputs.keys():
+                    return False
+                if str(type(self.loss_layers[attribute])) == "<class 'torch.nn.modules.loss.BCELoss'>":
+                    for attr in target_outputs:
+                        target_outputs[attr] = target_outputs[attr].type(torch.float32)
+                    for attr in output:
+                        output[attr] = output[attr].type(torch.float32)
+                    output_dict[attribute] = self.loss_layers[attribute](output[attribute], target_outputs[attribute].view(output[attribute].shape))
+                else: 
+                    for attr in target_outputs:
+                        target_outputs[attr] = target_outputs[attr].type(torch.long)
+                    for attr in output:
+                        output[attr] = output[attr].type(torch.float32)
+                    output_dict[attribute] = self.loss_layers[attribute](output[attribute], target_outputs[attribute])
+        return output_dict
 
 
 class Classifier(nn.Module):
@@ -97,7 +148,7 @@ def collate_fn(batch):
 writer = SummaryWriter()
 
 
-def validation_loop(validation_ds, device, model, loss):
+def validation_loop(validation_ds, device, model):
     precision_metric = Precision()
     with torch.no_grad():
         for data in tqdm(iter(validation_ds)):
@@ -106,63 +157,17 @@ def validation_loop(validation_ds, device, model, loss):
             targets = [{k: v.to(device) for k, v in t.items()} for t in labels]
             images = torch.stack(images)
             output = model(images, targets)
-            loss = torch.zeros(0)
+            if output == False:
+                continue
+            loss = torch.Tensor([0])
             for attr in output:
-                #precision = 0
-                #recall = 0
-                #fscore = 0
-                if attr == "age" or attr == "up_colours" or attr == "down_colours":
-                    if any(-1 in t[attr] for t in targets):
-                        continue
-                    loss_fn = nn.CrossEntropyLoss()
-                    out = output[attr]
-                    out = out.to(torch.float32)
-                    if len(targets) >= 2:
-                        target_list = []
-                        for t in targets:
-                            target_list.append(t[attr])
-                        target = torch.stack(tuple(target_list))
-                    else:
-                        target = targets[0][attr].view(1)
-                    target = target.to(torch.long)
-                    local_loss = loss_fn(out, target)
-                    loss = torch.add(loss, local_loss)
-                    #target_list = [0]*list(out.shape)[1]
-                    #target_list[target.item()] = 1
-                    #target_list = torch.tensor(target_list).view(1,4)
-                    #target_list_in = torch.argmax(target_list, dim = 1)
-                    #print(out.shape, target_list_in.shape)
-                    #precision_metric.update((target_list, out))
-                    #print(precision_metric.compute())
-                    #precision, recall, fscore = precision_recall_fscore_support(
-                    #    target_list_in, out)
-                else:
-                    loss_fn = nn.BCELoss()
-                    out = output[attr]
-                    out = out.to(torch.float32)
-                    if len(targets) >= 2:
-                        target_list = []
-                        for t in targets:
-                            target_list.append(t[attr])
-                        target = torch.stack(tuple(target_list)).view(out.shape)
-                    else:
-                        target = targets[0][attr].view(out.shape)
-                    target = target.to(torch.float32)
-                    local_loss = loss_fn(out, target)
-                    loss = torch.add(loss, local_loss)
-                    #precision, recall, fscore = precision_recall_fscore_support(
-                    #    target, out)
-                #writer.add_scalar(
-                #    f"Validation {attr} precision", precision)
-                #writer.add_scalar(f"Validation {attr} recall", recall)
-                #writer.add_scalar(f"Validation {attr} f_beta score", fscore)
-            for i, val in enumerate(loss):
-                print("Validation Loss/train", val, global_step = i)
-                writer.add_scalar("Validation Loss/train", val, global_step = i)
-                print(val, global_step)
+                loss = loss + output[attr].item()
+                print(f"Validation: Attr: {attr} || Loss: {output[attr].item()}")
+            print(f"Validation Overall Loss: {loss}")
+            writer.add_scalar(f"{attr} Loss/Validation", loss)
 
 
-def training_loop(torch_ds, validation_ds, optimizer, device, model, loss, epochs=20):
+def training_loop(torch_ds, validation_ds, optimizer, device, model, epochs=20):
     for i in range(epochs):
         for data in tqdm(iter(torch_ds)):
             # get the inputs; data is a list of [inputs, labels]
@@ -172,51 +177,20 @@ def training_loop(torch_ds, validation_ds, optimizer, device, model, loss, epoch
             targets = [{k: v.to(device) for k, v in t.items()} for t in labels]
             images = torch.stack(images)
             output = model(images, targets)
-            print("\n\n")
-            loss = torch.zeros(0)
-            for attr in output:
-                if attr == "age" or attr == "up_colours" or attr == "down_colours":
-                    if any(-1 in t[attr] for t in targets):
-                        continue
-                    loss_fn = nn.CrossEntropyLoss()
-                    out = output[attr]
-                    out = out.to(torch.float32)
-                    if len(targets) >= 2:
-                        target_list = []
-                        for t in targets:
-                            target_list.append(t[attr])
-                        target = torch.stack(tuple(target_list))
-                    else:
-                        target = targets[0][attr].view(1)
-                    target = target.to(torch.long)
-                    local_loss = loss_fn(out, target)
-                    loss = torch.add(loss, local_loss)
-                    print(f"{attr} Loss/train", local_loss, i)
-                    writer.add_scalar(f"{attr} Loss/train", local_loss, i)
-                    #writer.add_scalar(f"{attr} Predicted class and probability vs Real", torch.argmax(out).item(), torch.max(out).item(), target.item())
-                else:
-                    loss_fn = nn.BCELoss()
-                    out = output[attr]
-                    out = out.to(torch.float32)
-                    if len(targets) >= 2:
-                        target_list = []
-                        for t in targets:
-                            target_list.append(t[attr])
-                        target = torch.stack(tuple(target_list)).view(out.shape)
-                    else:
-                        target = targets[0][attr].view(out.shape)
-                    target = target.to(torch.float32)
-                    local_loss = loss_fn(out, target)
-                    loss = torch.add(loss, local_loss)
-                    print(f"{attr} Loss/train", local_loss, i)
-                    writer.add_scalar(f"{attr} Loss/train", local_loss, i)
-            if loss.nelement() != 0:
-                loss.sum().backward()
-            else:
+            if output == False:
                 continue
+            print("\n\n")
+            loss = torch.Tensor([0])
+            loss.requires_grad = True
+            for attr in output:
+                loss = loss + output[attr].item()
+                print(f"Training: Attr: {attr} || Loss: {output[attr].item()}")
+            print(f"Training: Overall Loss: {loss}")
+            loss.backward()
             optimizer.step()
+            writer.add_scalar(f"{attr} Loss/train", loss, i)
         print("DONE")
-        validation_loop(validation_ds, device, model, loss)
+        validation_loop(validation_ds, device, model)
         torch.save({'model': model.state_dict(),
                     'optimizer': optimizer.state_dict()
                     }, str(i).zfill(3) + "resnet50_fpn_frcnn_full.tar")
@@ -248,15 +222,15 @@ if __name__ == "__main__":
 
     #test_data = iter(torch_ds_test)
     #print(f"Count of test: {len(test_data)}")
-    train_data = iter(torch_ds_train)
-    attrs = []
-    for img, attr in torch_ds_train:
-        attrs.append(attr)
-    print(attrs[len(attrs) - 1])
+    # train_data = iter(torch_ds_train)
+    # attrs = []
+    # for img, attr in torch_ds_train:
+    #     attrs.append(attr)
+    # print(attrs[len(attrs) - 1])
 
-    print(f"Count of train: {len(train_data)}")
-    validate_data = iter(torch_ds_val)
-    print(f"Count of validate: {len(validate_data)}")
+    # print(f"Count of train: {len(train_data)}")
+    # validate_data = iter(torch_ds_val)
+    # print(f"Count of validate: {len(validate_data)}")
 
     # Parameters for loop:
     backbone = resnet_fpn_backbone(
@@ -270,10 +244,9 @@ if __name__ == "__main__":
     obj = Classifier(classifier_params, "3")
     model = OverallModel(backbone, obj, "3")
     model = model.train()
-    criteria = nn.CrossEntropyLoss()
     optimizer = optim.SGD(obj.parameters(), lr=0.001, momentum=0.9)
     epochs = 20
     device = torch.device(
         'cuda') if torch.cuda.is_available() else torch.device('cpu')
-    training_loop(torch_ds_train, torch_ds_val, optimizer, device, model, criteria, epochs)
+    training_loop(torch_ds_train, torch_ds_val, optimizer, device, model, epochs)
     print('Finished Training')
