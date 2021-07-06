@@ -142,10 +142,11 @@ def validation_loop(validation_ds, device, model, loss):
                         target, out)
                 writer.add_scalar(
                     f"Validation {attr} precision, recall, fscore", precision, recall, fscore)
-            writer.add_scalar("Validation Loss/train", loss)
+            for i, val in enumerate(loss):
+                writer.add_scalar("Validation Loss/train", loss, global_setp=i)
 
 
-def training_loop(torch_ds, validation_ds, optimizer, device, model, loss, epochs=20):
+def training_loop(torch_ds, validation_ds, optimizer, device, model, loss, epochs=2):
     for i in range(epochs):
         for data in tqdm(iter(torch_ds)):
             # get the inputs; data is a list of [inputs, labels]
@@ -215,13 +216,13 @@ if __name__ == "__main__":
         config['market_1501_ds']['train_path'].get(), True, 1, False)
 
     torch_ds_test = torch.utils.data.DataLoader(test_obj,
-                                                batch_size=2, num_workers=8,
+                                                batch_size=1, num_workers=8,
                                                 collate_fn=collate_fn)
     torch_ds_train = torch.utils.data.DataLoader(train_obj,
-                                                 batch_size=2, num_workers=8,
+                                                 batch_size=1, num_workers=8,
                                                  collate_fn=collate_fn)
     torch_ds_val = torch.utils.data.DataLoader(validate_obj,
-                                               batch_size=2, num_workers=8,
+                                               batch_size=1, num_workers=8,
                                                collate_fn=collate_fn)
 
     test_data = iter(torch_ds_test)
@@ -251,7 +252,7 @@ if __name__ == "__main__":
     children = list(model.children())
     criteria = nn.CrossEntropyLoss()
     optimizer = optim.SGD(obj.parameters(), lr=0.001, momentum=0.9)
-    epochs = 20
+    epochs = 2
     device = torch.device(
         'cuda') if torch.cuda.is_available() else torch.device('cpu')
     training_loop(torch_ds_train, torch_ds_val, optimizer,

@@ -28,11 +28,9 @@ class MarketDataset(object):
         self.one_hot = one_hot_encoded
         self.attribute_market = self.load_mats(
             config['market_1501_ds']['att_path'].get(), mode)
-
         # The second parameter in add_path is 0 for images, 1 for .mat files
         if image is True:
             self.paths = self.add_path(root_path, 0)
-
         else:
             self.paths = self.add_path(root_path, 1)
 
@@ -97,47 +95,47 @@ class MarketDataset(object):
             # No need to include image_index
             if col == "image_index":
                 continue
-            try:
-                if col == "age":
-                    # Creating a one-hot encoded for age
-                    if self.one_hot == True:
-                        age_list = [0] * 4
-                        age_list[int(attributes[col].item()) - 1] = 1
-                        self.targets[col] = torch.Tensor(age_list)
-                    else:
-                        self.targets[col] = torch.tensor(
-                            int(attributes[col].item() - 1))
-                # Grouping the up colors together since they are mutually exclusive
-                elif "up" in col and col != "up":
-                    # print(attributes[col])
-                    up_colours.append(int(attributes[col].item()))
-                    # Since there are 9 attributes that contain "up" in it, but one of them is
-                    # just "up", which does not correspond to colours, we subtracted one to indicate completion.
-                    if len(up_colours) == sum("up" in c for c in cols) - 1:
-                        if self.one_hot == True:
-                            self.targets["up_colours"] = torch.tensor(
-                                up_colours)
-                        else:
-                            self.targets["up_colours"] = torch.tensor(
-                                up_colours.index(1))
-                # Grouping the down colors together since they are mutually exclusive
-                elif "down" in col and col != "down":
-                    down_colours.append(int(attributes[col].item()))
-                    # Since there are 9 attributes that contain "down" in it, but one of them is
-                    # just "down", which does not correspond to colours, we subtracted one to indicate completion.
-                    if len(down_colours) == sum("down" in c for c in cols) - 1:
-                        if self.one_hot == True:
-                            self.targets["down_colours"] = torch.tensor(
-                                down_colours)
-                        else:
-                            self.targets["down_colours"] = torch.tensor(
-                                down_colours.index(1))
-                # For all other attributes.
+            if col == "age":
+                # Creating a one-hot encoded for age
+                if self.one_hot == True:
+                    age_list = [0] * 4
+                    age_list[int(attributes[col].item()) - 1] = 1
+                    self.targets[col] = torch.Tensor(age_list)
                 else:
                     self.targets[col] = torch.tensor(
-                        int(attributes[col].item()))
-            except:
-                continue
+                        int(attributes[col].item() - 1))
+            # Grouping the up colors together since they are mutually exclusive
+            elif "up" in col and col != "up":
+                up_colours.append(int(attributes[col].item()))
+                # Since there are 9 attributes that contain "up" in it, but one of them is
+                # just "up", which does not correspond to colours, we subtracted one to indicate completion.
+                if len(up_colours) == sum("up" in c for c in cols) - 1:
+                    if self.one_hot == True:
+                        self.targets["up_colours"] = torch.tensor(up_colours)
+                    else:
+                        if 1 in up_colours:
+                            self.targets["up_colours"] = torch.tensor(
+                                up_colours.index(1))
+                        else:
+                            self.targets["up_colours"] = torch.tensor([-1])
+            # Grouping the down colors together since they are mutually exclusive
+            elif "down" in col and col != "down":
+                down_colours.append(int(attributes[col].item()))
+                # Since there are 9 attributes that contain "down" in it, but one of them is
+                # just "down", which does not correspond to colours, we subtracted one to indicate completion.
+                if len(down_colours) == sum("down" in c for c in cols) - 1:
+                    if self.one_hot == True:
+                        self.targets["down_colours"] = torch.tensor(
+                            down_colours)
+                    else:
+                        if 1 in down_colours:
+                            self.targets["down_colours"] = torch.tensor(
+                                down_colours.index(1))
+                        else:
+                            self.targets["down_colours"] = torch.tensor([-1])
+            # For all other attributes.
+            else:
+                self.targets[col] = torch.tensor(int(attributes[col].item()))
         img = F.to_tensor(img)
         return (img, self.targets)
 
