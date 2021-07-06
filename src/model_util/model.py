@@ -12,7 +12,7 @@ from tqdm import tqdm
 import torch
 from torch.utils.tensorboard import SummaryWriter
 from sklearn.metrics import precision_recall_fscore_support
-from ignite.metrics import Precision
+from sklearn.metrics import accuracy_score
 
 import warnings
 warnings.simplefilter(action='ignore', category=FutureWarning)
@@ -42,6 +42,8 @@ class OverallModel(nn.Module):
     def forward(self, input, targets):
         back_out = self.backbone(input)
         output = self.classifier(back_out[self.output_to_use])
+        #metrics = self.metric_calculator(output, targets)
+        #print(metrics)
         target_outputs = {}
         if len(targets) >= 2:
             for attr in targets[0].keys():
@@ -62,7 +64,6 @@ class OverallModel(nn.Module):
             target_outputs = targets[0]
             for attr in target_outputs:
                 target_outputs[attr] = target_outputs[attr].view(1)
-            print(target_outputs)
         output_dict = {}
         if self.training:
             for attribute in self.loss_layers.keys():
@@ -81,6 +82,35 @@ class OverallModel(nn.Module):
                         output[attr] = output[attr].type(torch.float32)
                     output_dict[attribute] = self.loss_layers[attribute](output[attribute], target_outputs[attribute])
         return output_dict
+
+    def metric_calculator(self, y_pred, y_true):
+        metrics = {}
+        #print(type(y_pred), type(y_true))
+
+        y_pred_copy = {}
+        for attr in y_pred:
+            y_pred_copy[attr] = y_pred[attr]
+        print(id(y_pred) == id(y_pred_copy))
+        for attr in y_pred:
+            if attr != 'age' and attr != 'up_colours' and attr != 'down_colours':
+                y_pred_copy[attr] = torch.round(y_pred[attr])
+        for attr in y_pred_copy:
+            if attr == 'age' or attr == 'up_colours' or attr == 'down_colours':
+                precision, recall, fscore, _ = precision_recall_fscore_support(torch.flatten(torch.stack(tuple(t[attr] for t in y_true))).tolist(), torch.argmax(y_pred_copy[attr], dim = 1).tolist(), average = 'micro')
+                accuracy = accuracy_score(torch.flatten(torch.stack(tuple(t[attr] for t in y_true))).tolist(), torch.argmax(y_pred_copy[attr], dim = 1).tolist())
+                metrics[attr] = {'recall': recall,
+                                'precision': precision,
+                                'fscore': fscore,
+                                'accuracy': accuracy}
+            else:
+                precision, recall, fscore, _ = precision_recall_fscore_support(torch.flatten(torch.stack(tuple(t[attr] for t in y_true))).tolist(), torch.flatten(y_pred_copy[attr]).tolist(), average = 'micro')
+                accuracy = accuracy_score(torch.flatten(torch.stack(tuple(t[attr] for t in y_true))).tolist(), torch.flatten(y_pred_copy[attr]).tolist())
+                metrics[attr] = {'recall': recall,
+                                'precision': precision,
+                                'fscore': fscore,
+                                'accuracy': accuracy}
+
+        return metrics
 
 
 class Classifier(nn.Module):
@@ -145,9 +175,6 @@ def collate_fn(batch):
     return tuple(zip(*batch))
 
 
-writer = SummaryWriter()
-
-
 def validation_loop(validation_ds, device, model):
     precision_metric = Precision()
     with torch.no_grad():
@@ -163,8 +190,9 @@ def validation_loop(validation_ds, device, model):
             for attr in output:
                 loss = loss + output[attr].item()
                 print(f"Validation: Attr: {attr} || Loss: {output[attr].item()}")
+                writer.add_scalar(f"{attr} Loss/Validation", output[attr].item())
             print(f"Validation Overall Loss: {loss}")
-            writer.add_scalar(f"{attr} Loss/Validation", loss)
+            writer.add_scalar("Validation Overall Loss", loss)
 
 
 def training_loop(torch_ds, validation_ds, optimizer, device, model, epochs=20):
@@ -175,6 +203,12 @@ def training_loop(torch_ds, validation_ds, optimizer, device, model, epochs=20):
             optimizer.zero_grad()
             images = list(image.to(device) for image in inputs)
             targets = [{k: v.to(device) for k, v in t.items()} for t in labels]
+            #for target in targets:
+            #    for attr in target:
+            #        if target[attr].item() == -1:
+            #            idx = targets.index(target)
+            #            targets.remove(target)
+            #            images.remove(target)
             images = torch.stack(images)
             output = model(images, targets)
             if output == False:
@@ -185,10 +219,11 @@ def training_loop(torch_ds, validation_ds, optimizer, device, model, epochs=20):
             for attr in output:
                 loss = loss + output[attr].item()
                 print(f"Training: Attr: {attr} || Loss: {output[attr].item()}")
+                writer.add_scalar(f"{attr} Loss/train", output[attr].item())
             print(f"Training: Overall Loss: {loss}")
+            writer.add_scalar("Training Overall Loss", loss)
             loss.backward()
             optimizer.step()
-            writer.add_scalar(f"{attr} Loss/train", loss, i)
         print("DONE")
         validation_loop(validation_ds, device, model)
         torch.save({'model': model.state_dict(),
@@ -199,6 +234,7 @@ def training_loop(torch_ds, validation_ds, optimizer, device, model, epochs=20):
 
 
 if __name__ == "__main__":
+    writer = SummaryWriter()
     config = confuse.Configuration('market1501', __name__)
     config.set_file(Path(
         r"C:\\Users\\Div\\Desktop\\Research\\reid\\reid\\explainable-id-reid\\src\\dataset_util\\market1501.yml"))
@@ -243,6 +279,10 @@ if __name__ == "__main__":
     # "1", "2", "3", or "pool"
     obj = Classifier(classifier_params, "3")
     model = OverallModel(backbone, obj, "3")
+    #for param in model.parameters():
+    #    param.requires_grad = True
+    for k,v in model.named_parameters():
+        print('{}: {}'.format(k, v.requires_grad))
     model = model.train()
     optimizer = optim.SGD(obj.parameters(), lr=0.001, momentum=0.9)
     epochs = 20
