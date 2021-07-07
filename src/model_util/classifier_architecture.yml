@@ -2,9 +2,9 @@ hidden_layers:
   - type: linear
     kwargs:
       # in_features to use based on Resnet50-FPN backbone output being passed:
-      # For '1', 4096
-      # For '2', 2048
-      # For '3', 1024
+      # For '1', 32768
+      # For '2', 8192
+      # For '3', 2048
       # For 'pool', 512
       in_features: 512
       out_features: 512
@@ -139,3 +139,14 @@ attribute_classification_layers:
       in_features: 512
       out_features: 8
       bias: true
+
+attributes_to_use:
+  - bag
+  - backpack
+  - clothes
+  - down
+  - gender
+  - hair
+  - handbag
+  - hat
+  - up

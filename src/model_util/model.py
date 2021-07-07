@@ -55,8 +55,6 @@ class OverallModel(nn.Module):
                 if status == False:
                     continue
                 target_list = []
-                if any(-1 in t[attr] for t in targets):
-                        continue
                 for index in range(len(targets)):
                     target_list.append(targets[index][attr])
                 target_outputs[attr] = torch.stack(tuple(target_list))
@@ -66,9 +64,7 @@ class OverallModel(nn.Module):
                 target_outputs[attr] = target_outputs[attr].view(1)
         output_dict = {}
         if self.training:
-            for attribute in self.loss_layers.keys():
-                if attribute not in target_outputs.keys():
-                    return False
+            for attribute in target_outputs:
                 if str(type(self.loss_layers[attribute])) == "<class 'torch.nn.modules.loss.BCELoss'>":
                     for attr in target_outputs:
                         target_outputs[attr] = target_outputs[attr].type(torch.float32)
@@ -176,7 +172,6 @@ def collate_fn(batch):
 
 
 def validation_loop(validation_ds, device, model):
-    precision_metric = Precision()
     with torch.no_grad():
         for data in tqdm(iter(validation_ds)):
             inputs, labels = data
@@ -197,18 +192,13 @@ def validation_loop(validation_ds, device, model):
 
 def training_loop(torch_ds, validation_ds, optimizer, device, model, epochs=20):
     for i in range(epochs):
+        break
         for data in tqdm(iter(torch_ds)):
             # get the inputs; data is a list of [inputs, labels]
             inputs, labels = data
             optimizer.zero_grad()
             images = list(image.to(device) for image in inputs)
             targets = [{k: v.to(device) for k, v in t.items()} for t in labels]
-            #for target in targets:
-            #    for attr in target:
-            #        if target[attr].item() == -1:
-            #            idx = targets.index(target)
-            #            targets.remove(target)
-            #            images.remove(target)
             images = torch.stack(images)
             output = model(images, targets)
             if output == False:
@@ -225,6 +215,7 @@ def training_loop(torch_ds, validation_ds, optimizer, device, model, epochs=20):
             loss.backward()
             optimizer.step()
         print("DONE")
+        break
         validation_loop(validation_ds, device, model)
         torch.save({'model': model.state_dict(),
                     'optimizer': optimizer.state_dict()
@@ -238,14 +229,18 @@ if __name__ == "__main__":
     config = confuse.Configuration('market1501', __name__)
     config.set_file(Path(
         r"C:\\Users\\Div\\Desktop\\Research\\reid\\reid\\explainable-id-reid\\src\\dataset_util\\market1501.yml"))
+    cfg = confuse.Configuration('model_architecture', __name__, read=False)
+    cfg.set_file(
+        "C:\\Users\\Div\\Desktop\\Research\\reid\\reid\\explainable-id-reid\\src\\model_util\\classifier_architecture.yml")
+    classifier_params = cfg.get()
     from processor import MarketDataset
     test_obj = MarketDataset(
-        config['market_1501_ds']['test_path'].get(), True, 2, False)
+        config['market_1501_ds']['test_path'].get(), True, 2, False, classifier_params['attributes_to_use'])
     train_obj = MarketDataset(
-        config['market_1501_ds']['train_path'].get(), True, 0, False)
+        config['market_1501_ds']['train_path'].get(), True, 0, False, classifier_params['attributes_to_use'])
     validate_obj = MarketDataset(
-        config['market_1501_ds']['train_path'].get(), True, 1, False)
-
+        config['market_1501_ds']['train_path'].get(), True, 1, False, classifier_params['attributes_to_use'])
+    print(train_obj.__getitem__(9000))
     torch_ds_test = torch.utils.data.DataLoader(test_obj,
                                                 batch_size=2, num_workers=8,
                                                 collate_fn=collate_fn)
@@ -258,7 +253,8 @@ if __name__ == "__main__":
 
     #test_data = iter(torch_ds_test)
     #print(f"Count of test: {len(test_data)}")
-    # train_data = iter(torch_ds_train)
+    #train_data = iter(torch_ds_train)
+    #print(len(train_data))
     # attrs = []
     # for img, attr in torch_ds_train:
     #     attrs.append(attr)
@@ -271,14 +267,10 @@ if __name__ == "__main__":
     # Parameters for loop:
     backbone = resnet_fpn_backbone(
         'resnet50', pretrained=True, trainable_layers=0)
-    cfg = confuse.Configuration('model_architecture', __name__, read=False)
-    cfg.set_file(
-        "C:\\Users\\Div\\Desktop\\Research\\reid\\reid\\explainable-id-reid\\src\\model_util\\classifier_architecture.yml")
-    classifier_params = cfg.get()
     # The second argument is the output being used as a String,
     # "1", "2", "3", or "pool"
-    obj = Classifier(classifier_params, "3")
-    model = OverallModel(backbone, obj, "3")
+    obj = Classifier(classifier_params, "2")
+    model = OverallModel(backbone, obj, "2")
     #for param in model.parameters():
     #    param.requires_grad = True
     for k,v in model.named_parameters():
