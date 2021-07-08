@@ -10,9 +10,10 @@ import torch.nn as nn
 import torch.optim as optim
 from tqdm import tqdm
 import torch
+import matplotlib.pyplot as plt
 from torch.utils.tensorboard import SummaryWriter
 from sklearn.metrics import precision_recall_fscore_support
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import confusion_matrix
 
 import warnings
 warnings.simplefilter(action='ignore', category=FutureWarning)
@@ -42,8 +43,6 @@ class OverallModel(nn.Module):
     def forward(self, input, targets):
         back_out = self.backbone(input)
         output = self.classifier(back_out[self.output_to_use])
-        #metrics = self.metric_calculator(output, targets)
-        #print(metrics)
         target_outputs = {}
         if len(targets) >= 2:
             for attr in targets[0].keys():
@@ -77,36 +76,84 @@ class OverallModel(nn.Module):
                     for attr in output:
                         output[attr] = output[attr].type(torch.float32)
                     output_dict[attribute] = self.loss_layers[attribute](output[attribute], target_outputs[attribute])
-        return output_dict
+        return output, output_dict
 
-    def metric_calculator(self, y_pred, y_true):
-        metrics = {}
-        #print(type(y_pred), type(y_true))
+def metric_calculator(y_pred, y_true, classifier_params):
+    metrics = {}
+    predictions = {}
+    real = {}
 
-        y_pred_copy = {}
-        for attr in y_pred:
-            y_pred_copy[attr] = y_pred[attr]
-        print(id(y_pred) == id(y_pred_copy))
-        for attr in y_pred:
-            if attr != 'age' and attr != 'up_colours' and attr != 'down_colours':
-                y_pred_copy[attr] = torch.round(y_pred[attr])
-        for attr in y_pred_copy:
+    for attr in classifier_params:
+        predictions[attr] = []
+        real[attr] = []
+        metrics[attr] = 0
+    
+    for t in y_pred:
+        for attr in classifier_params:
             if attr == 'age' or attr == 'up_colours' or attr == 'down_colours':
-                precision, recall, fscore, _ = precision_recall_fscore_support(torch.flatten(torch.stack(tuple(t[attr] for t in y_true))).tolist(), torch.argmax(y_pred_copy[attr], dim = 1).tolist(), average = 'micro')
-                accuracy = accuracy_score(torch.flatten(torch.stack(tuple(t[attr] for t in y_true))).tolist(), torch.argmax(y_pred_copy[attr], dim = 1).tolist())
-                metrics[attr] = {'recall': recall,
-                                'precision': precision,
-                                'fscore': fscore,
-                                'accuracy': accuracy}
+                to_add = torch.argmax(t[attr], dim = 1)
+                predictions[attr].append(to_add)
             else:
-                precision, recall, fscore, _ = precision_recall_fscore_support(torch.flatten(torch.stack(tuple(t[attr] for t in y_true))).tolist(), torch.flatten(y_pred_copy[attr]).tolist(), average = 'micro')
-                accuracy = accuracy_score(torch.flatten(torch.stack(tuple(t[attr] for t in y_true))).tolist(), torch.flatten(y_pred_copy[attr]).tolist())
-                metrics[attr] = {'recall': recall,
-                                'precision': precision,
-                                'fscore': fscore,
-                                'accuracy': accuracy}
+                predictions[attr].append(t[attr])
 
-        return metrics
+    for attr in predictions:
+        predictions[attr] = torch.stack(tuple(predictions[attr]))
+    
+    for t in y_true:
+        for attr in classifier_params:
+            real[attr].append(t[attr])
+
+    for attr in real:
+        real[attr] = torch.stack(tuple(real[attr]))
+
+    this = torch.flatten(real['age'])
+    that = torch.flatten(predictions['age'])
+    print(torch.flatten(real[attr]).shape)
+    print(torch.round(torch.flatten(predictions[attr]).type(torch.float)).shape)
+
+    for attr in metrics:
+        if attr != 'age' and attr != 'down_colours' and attr != 'up_colours':
+            precision, recall, fscore, _ = precision_recall_fscore_support(torch.flatten(real[attr]), torch.round(torch.flatten(predictions[attr]).type(torch.float)), average = 'weighted')
+            metrics[attr] = {'precision': precision, 'recall': recall}
+        else:
+            conf = confusion_matrix(torch.flatten(real[attr]), torch.round(torch.flatten(predictions[attr]).type(torch.float)))
+            print(type(conf))
+            plt.imshow(conf, cmap='binary', interpolation='None')
+            plt.show()
+        
+    print(metrics)
+    #for t in y_true:
+    #    print(t)
+
+    #print(predictions['age'])
+    #print(real['age'])
+    #print(predictions['gender'])
+    #print(real['gender'])
+
+        # y_pred_copy = {}
+        # for attr in y_pred:
+        #     y_pred_copy[attr] = y_pred[attr]
+        # print(id(y_pred) == id(y_pred_copy))
+        # for attr in y_pred:
+        #     if attr != 'age' and attr != 'up_colours' and attr != 'down_colours':
+        #         y_pred_copy[attr] = torch.round(y_pred[attr])
+        # for attr in y_pred_copy:
+        #     if attr == 'age' or attr == 'up_colours' or attr == 'down_colours':
+        #         precision, recall, fscore, _ = precision_recall_fscore_support(torch.flatten(torch.stack(tuple(t[attr] for t in y_true))).tolist(), torch.argmax(y_pred_copy[attr], dim = 1).tolist(), average = 'micro')
+        #         accuracy = accuracy_score(torch.flatten(torch.stack(tuple(t[attr] for t in y_true))).tolist(), torch.argmax(y_pred_copy[attr], dim = 1).tolist())
+        #         metrics[attr] = {'recall': recall,
+        #                         'precision': precision,
+        #                         'fscore': fscore,
+        #                         'accuracy': accuracy}
+        #     else:
+        #         precision, recall, fscore, _ = precision_recall_fscore_support(torch.flatten(torch.stack(tuple(t[attr] for t in y_true))).tolist(), torch.flatten(y_pred_copy[attr]).tolist(), average = 'micro')
+        #         accuracy = accuracy_score(torch.flatten(torch.stack(tuple(t[attr] for t in y_true))).tolist(), torch.flatten(y_pred_copy[attr]).tolist())
+        #         metrics[attr] = {'recall': recall,
+        #                         'precision': precision,
+        #                         'fscore': fscore,
+        #                         'accuracy': accuracy}
+
+        # return metrics
 
 
 class Classifier(nn.Module):
@@ -138,21 +185,23 @@ class Classifier(nn.Module):
 
     def attribute_classifier(self, classifier_params):
         layers_to_add = classifier_params["attribute_classification_layers"]
+        layers_to_use = classifier_params["attributes_to_use"]
         self.attribute_layers_dict = {}
         activation = None
         for layer in layers_to_add:
-            if layer['type'] == 'linear':
-                linear = nn.Linear(**layer['kwargs'])
-            if layer['activation'] == 'softmax':
-                activation = nn.Softmax(dim=None)
-            elif layer['activation'] == 'sigmoid':
-                activation = nn.Sigmoid()
-            if activation == None:
-                self.attribute_layers_dict[layer['attribute']] = nn.Sequential(
-                    linear)
-            else:
-                self.attribute_layers_dict[layer['attribute']] = nn.Sequential(
-                    linear, activation)
+            if layer['attribute'] in layers_to_use:
+                if layer['type'] == 'linear':
+                    linear = nn.Linear(**layer['kwargs'])
+                if layer['activation'] == 'softmax':
+                    activation = nn.Softmax(dim=None)
+                elif layer['activation'] == 'sigmoid':
+                    activation = nn.Sigmoid()
+                if activation == None:
+                    self.attribute_layers_dict[layer['attribute']] = nn.Sequential(
+                        linear)
+                else:
+                    self.attribute_layers_dict[layer['attribute']] = nn.Sequential(
+                        linear, activation)
 
     def forward(self, backbone_output):
         x = backbone_output
@@ -171,36 +220,50 @@ def collate_fn(batch):
     return tuple(zip(*batch))
 
 
-def validation_loop(validation_ds, device, model):
+def validation_loop(validation_ds, device, model, classifier_params):
+    predictions = []
+    target_list_input = []
+    step_counter = 0
     with torch.no_grad():
         for data in tqdm(iter(validation_ds)):
             inputs, labels = data
             images = list(image.to(device) for image in inputs)
             targets = [{k: v.to(device) for k, v in t.items()} for t in labels]
+            target_attrs = {}
+            for attr in targets[0].keys():
+                target_list = []
+                for index in range(len(targets)):
+                    target_list.append(targets[index][attr])
+                target_attrs[attr] = torch.stack(tuple(target_list))
             images = torch.stack(images)
-            output = model(images, targets)
-            if output == False:
+            output, losses = model(images, targets)
+            predictions.append(output)
+            target_list_input.append(target_attrs)
+            if losses == False:
                 continue
             loss = torch.Tensor([0])
-            for attr in output:
-                loss = loss + output[attr].item()
-                print(f"Validation: Attr: {attr} || Loss: {output[attr].item()}")
-                writer.add_scalar(f"{attr} Loss/Validation", output[attr].item())
+            for attr in losses:
+                loss = loss + losses[attr].item()
+                print(f"Validation: Attr: {attr} || Loss: {losses[attr].item()}")
+                writer.add_scalar(f"{attr} Loss/Validation", losses[attr].item(), step_counter)
             print(f"Validation Overall Loss: {loss}")
-            writer.add_scalar("Validation Overall Loss", loss)
+            writer.add_scalar("Validation Overall Loss", loss, step_counter)
+            step_counter += 1
+        metric_calculator(predictions, target_list_input, classifier_params)
 
 
-def training_loop(torch_ds, validation_ds, optimizer, device, model, epochs=20):
+def training_loop(torch_ds, validation_ds, optimizer, device, model, classifier_params, epochs=20):
+    step_counter = 0
     for i in range(epochs):
-        break
         for data in tqdm(iter(torch_ds)):
+            break
             # get the inputs; data is a list of [inputs, labels]
             inputs, labels = data
             optimizer.zero_grad()
             images = list(image.to(device) for image in inputs)
             targets = [{k: v.to(device) for k, v in t.items()} for t in labels]
             images = torch.stack(images)
-            output = model(images, targets)
+            _,output = model(images, targets)
             if output == False:
                 continue
             print("\n\n")
@@ -209,14 +272,15 @@ def training_loop(torch_ds, validation_ds, optimizer, device, model, epochs=20):
             for attr in output:
                 loss = loss + output[attr].item()
                 print(f"Training: Attr: {attr} || Loss: {output[attr].item()}")
-                writer.add_scalar(f"{attr} Loss/train", output[attr].item())
+                writer.add_scalar(f"{attr} Loss/train", output[attr].item(), step_counter)
             print(f"Training: Overall Loss: {loss}")
-            writer.add_scalar("Training Overall Loss", loss)
+            writer.add_scalar("Training Overall Loss", loss, step_counter)
             loss.backward()
             optimizer.step()
+            step_counter += 1
         print("DONE")
+        validation_loop(validation_ds, device, model, classifier_params)
         break
-        validation_loop(validation_ds, device, model)
         torch.save({'model': model.state_dict(),
                     'optimizer': optimizer.state_dict()
                     }, str(i).zfill(3) + "resnet50_fpn_frcnn_full.tar")
@@ -233,6 +297,7 @@ if __name__ == "__main__":
     cfg.set_file(
         "C:\\Users\\Div\\Desktop\\Research\\reid\\reid\\explainable-id-reid\\src\\model_util\\classifier_architecture.yml")
     classifier_params = cfg.get()
+
     from processor import MarketDataset
     test_obj = MarketDataset(
         config['market_1501_ds']['test_path'].get(), True, 2, False, classifier_params['attributes_to_use'])
@@ -240,7 +305,7 @@ if __name__ == "__main__":
         config['market_1501_ds']['train_path'].get(), True, 0, False, classifier_params['attributes_to_use'])
     validate_obj = MarketDataset(
         config['market_1501_ds']['train_path'].get(), True, 1, False, classifier_params['attributes_to_use'])
-    print(train_obj.__getitem__(9000))
+
     torch_ds_test = torch.utils.data.DataLoader(test_obj,
                                                 batch_size=2, num_workers=8,
                                                 collate_fn=collate_fn)
@@ -254,15 +319,9 @@ if __name__ == "__main__":
     #test_data = iter(torch_ds_test)
     #print(f"Count of test: {len(test_data)}")
     #train_data = iter(torch_ds_train)
-    #print(len(train_data))
-    # attrs = []
-    # for img, attr in torch_ds_train:
-    #     attrs.append(attr)
-    # print(attrs[len(attrs) - 1])
-
-    # print(f"Count of train: {len(train_data)}")
-    # validate_data = iter(torch_ds_val)
-    # print(f"Count of validate: {len(validate_data)}")
+    #print(f"Count of train: {len(train_data)}")
+    #validate_data = iter(torch_ds_val)
+    #print(f"Count of validate: {len(validate_data)}")
 
     # Parameters for loop:
     backbone = resnet_fpn_backbone(
@@ -280,5 +339,5 @@ if __name__ == "__main__":
     epochs = 20
     device = torch.device(
         'cuda') if torch.cuda.is_available() else torch.device('cpu')
-    training_loop(torch_ds_train, torch_ds_val, optimizer, device, model, epochs)
+    training_loop(torch_ds_train, torch_ds_val, optimizer, device, model, classifier_params['attributes_to_use'], epochs)
     print('Finished Training')

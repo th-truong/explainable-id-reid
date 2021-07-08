@@ -141,12 +141,15 @@ attribute_classification_layers:
       bias: true
 
 attributes_to_use:
-  - bag
+  - age
   - backpack
+  - bag
   - clothes
   - down
+  - down_colours
   - gender
   - hair
   - handbag
   - hat
   - up
+  - up_colours

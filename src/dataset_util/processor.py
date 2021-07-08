@@ -18,13 +18,14 @@ class MarketDataset(object):
     # 0 - train
     # 1 - validate
     # 2 - test
-    def __init__(self, root_path, image, mode, one_hot_encoded):
+    def __init__(self, root_path, image, mode, one_hot_encoded, attributes_to_use):
         self.paths = []
         self.mode = mode
         self.root_path = root_path
         self.one_hot = one_hot_encoded
         self.attribute_market = self.load_mats(
             config['market_1501_ds']['att_path'].get(), mode)
+        self.attributes_to_use = attributes_to_use
 
         # The second parameter in add_path is 0 for images, 1 for .mat files
         if image is True:
@@ -60,10 +61,18 @@ class MarketDataset(object):
 
     def add_path(self, path, type):
         file_paths = []
-        temp_count = 0
+        indexes_to_skip = []
+        for row in self.attribute_market.iterrows():
+            if row[1]['upblack'] == 0 and row[1]['upwhite'] == 0 and row[1]['upred'] == 0 and row[1]['uppurple'] == 0 and row[1]['upyellow'] == 0 and row[1]['upgray'] == 0 and row[1]['upblue'] == 0 and row[1]['upgreen'] == 0:
+                indexes_to_skip.append(row[1]['image_index'][0])
+            if row[1]['downblack'] == 0 and row[1]['downwhite'] == 0 and row[1]['downpink'] == 0 and row[1]['downpurple'] == 0 and row[1]['downyellow'] == 0 and row[1]['downgray'] == 0 and row[1]['downblue'] == 0 and row[1]['downgreen'] == 0 and row[1]['downbrown'] == 0:
+                if row[1]['image_index'][0] not in indexes_to_skip:
+                    indexes_to_skip.append(row[1]['image_index'][0])
         for file in os.listdir(path):
             if type == 0:
                 if file[-4:] == ".jpg":
+                    if file[0:4] in indexes_to_skip:
+                        continue
                     # For validation, indexes from 0002 to 0199 (100 identities) are used. 
                     # Everything else is used for training (0201 onwards).
                     if self.mode == 0:
@@ -84,12 +93,18 @@ class MarketDataset(object):
         img, attributes = self.image_loader(self.paths[idx])
         self.targets = {}
         # Always sorted alphabetically
-        cols = sorted(list(attributes.columns))
+        cols = []
+        for col in sorted(list(attributes.columns)):
+            if col in self.attributes_to_use:
+                cols.append(col)
+            if "down_colours" in self.attributes_to_use and "down" in col and col != "down":
+                cols.append(col)
+            if "up_colours" in self.attributes_to_use and "up" in col and col != "up":
+                cols.append(col)
         # Index positions: [upblack, upblue, upgray, upgreen, uppurple, upred, upwhite, upyellow]
         up_colours = []
         # Index positions: [downblack, downblue, downbrown, downgray, downgreen, downpink, downpurple, downwhite, downyellow]
         down_colours = []
-        # print(attributes[cols[0]].item())
         for col in cols:
             # No need to include image_index
             if col == "image_index":
@@ -109,12 +124,9 @@ class MarketDataset(object):
                 # just "up", which does not correspond to colours, we subtracted one to indicate completion.
                 if len(up_colours) == sum("up" in c for c in cols) - 1:
                     if self.one_hot == True:
-                            self.targets["up_colours"] = torch.tensor(up_colours)
+                        self.targets["up_colours"] = torch.tensor(up_colours)
                     else:
-                        if 1 in up_colours:
-                            self.targets["up_colours"] = torch.tensor(up_colours.index(1))
-                        else: 
-                            self.targets["up_colours"] = torch.tensor([-1])
+                        self.targets["up_colours"] = torch.tensor(up_colours.index(1))
             # Grouping the down colors together since they are mutually exclusive
             elif "down" in col and col != "down":
                 down_colours.append(int(attributes[col].item()))
@@ -124,10 +136,7 @@ class MarketDataset(object):
                     if self.one_hot == True:
                         self.targets["down_colours"] = torch.tensor(down_colours)
                     else:
-                        if 1 in down_colours:
-                            self.targets["down_colours"] = torch.tensor(down_colours.index(1))
-                        else:
-                            self.targets["down_colours"] = torch.tensor([-1])
+                        self.targets["down_colours"] = torch.tensor(down_colours.index(1))
             # For all other attributes.
             else:
                 self.targets[col] = torch.tensor(int(attributes[col].item()))
