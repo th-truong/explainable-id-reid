@@ -10,9 +10,11 @@ import torch.nn as nn
 import torch.optim as optim
 from tqdm import tqdm
 import torch
+import matplotlib.pyplot as plt
 from torch.utils.tensorboard import SummaryWriter
 from sklearn.metrics import precision_recall_fscore_support
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import confusion_matrix
+
 import warnings
 warnings.simplefilter(action='ignore', category=FutureWarning)
 warnings.simplefilter(action='ignore', category=UserWarning)
@@ -23,41 +25,53 @@ def collate_fn(batch):
     return tuple(zip(*batch))
 
 
-writer = SummaryWriter()
-
-
-def validation_loop(validation_ds, device, model):
+def validation_loop(validation_ds, device, model, classifier_params):
+    predictions = []
+    target_list_input = []
+    step_counter = 0
     with torch.no_grad():
         for data in tqdm(iter(validation_ds)):
             inputs, labels = data
             images = list(image.to(device) for image in inputs)
             targets = [{k: v.to(device) for k, v in t.items()} for t in labels]
+            target_attrs = {}
+            for attr in targets[0].keys():
+                target_list = []
+                for index in range(len(targets)):
+                    target_list.append(targets[index][attr])
+                target_attrs[attr] = torch.stack(tuple(target_list))
             images = torch.stack(images)
-            output = model(images, targets)
-            if output == False:
+            output, losses = model(images, targets)
+            predictions.append(output)
+            target_list_input.append(target_attrs)
+            if losses == False:
                 continue
             loss = torch.Tensor([0])
-            for attr in output:
-                loss = loss + output[attr].item()
+            for attr in losses:
+                loss = loss + losses[attr].item()
                 print(
-                    f"Validation: Attr: {attr} || Loss: {output[attr].item()}")
-                writer.add_scalar(
-                    f"{attr} Loss/Validation", output[attr].item())
+                    f"Validation: Attr: {attr} || Loss: {losses[attr].item()}")
+                writer.add_scalar(f"{attr} Loss/Validation",
+                                  losses[attr].item(), step_counter)
             print(f"Validation Overall Loss: {loss}")
-            writer.add_scalar("Validation Overall Loss", loss)
+            writer.add_scalar("Validation Overall Loss", loss, step_counter)
+            step_counter += 1
+        from model_util.model2 import metric_calculator
+        metric_calculator(predictions, target_list_input, classifier_params)
 
 
-def training_loop(torch_ds, validation_ds, optimizer, device, model, epochs=20):
+def training_loop(torch_ds, validation_ds, optimizer, device, model, classifier_params, epochs=20):
+    step_counter = 0
     for i in range(epochs):
         for data in tqdm(iter(torch_ds)):
+            break
             # get the inputs; data is a list of [inputs, labels]
             inputs, labels = data
             optimizer.zero_grad()
             images = list(image.to(device) for image in inputs)
             targets = [{k: v.to(device) for k, v in t.items()} for t in labels]
             images = torch.stack(images)
-            output = model(images, targets)
-            break
+            _, output = model(images, targets)
             if output == False:
                 continue
             print("\n\n")
@@ -66,14 +80,16 @@ def training_loop(torch_ds, validation_ds, optimizer, device, model, epochs=20):
             for attr in output:
                 loss = loss + output[attr].item()
                 print(f"Training: Attr: {attr} || Loss: {output[attr].item()}")
-                writer.add_scalar(f"{attr} Loss/train", output[attr].item())
+                writer.add_scalar(f"{attr} Loss/train",
+                                  output[attr].item(), step_counter)
             print(f"Training: Overall Loss: {loss}")
-            writer.add_scalar("Training Overall Loss", loss)
+            writer.add_scalar("Training Overall Loss", loss, step_counter)
             loss.backward()
             optimizer.step()
+            step_counter += 1
         print("DONE")
+        validation_loop(validation_ds, device, model, classifier_params)
         break
-        validation_loop(validation_ds, device, model)
         torch.save({'model': model.state_dict(),
                     'optimizer': optimizer.state_dict()
                     }, str(i).zfill(3) + "resnet50_fpn_frcnn_full.tar")
@@ -82,16 +98,23 @@ def training_loop(torch_ds, validation_ds, optimizer, device, model, epochs=20):
 
 
 if __name__ == "__main__":
+    writer = SummaryWriter()
     config = confuse.Configuration('market1501', __name__)
     config.set_file(Path(
         r"C:\\Users\\netra\\GithubEncm369\\reid\\explainable-id-reid\\src\\dataset_util\\market1501.yml"))
+    cfg = confuse.Configuration('model_architecture', __name__, read=False)
+    cfg.set_file(
+        "C:\\Users\\netra\\GithubEncm369\\reid\\explainable-id-reid\\src\\model_util\\classifier_architecture.yml")
+    classifier_params = cfg.get()
+
     from dataset_util.processor import MarketDataset
     test_obj = MarketDataset(
-        config['market_1501_ds']['test_path'].get(), True, 2, False)
+        config['market_1501_ds']['test_path'].get(), True, 2, False, classifier_params['attributes_to_use'])
     train_obj = MarketDataset(
-        config['market_1501_ds']['train_path'].get(), True, 0, False)
+        config['market_1501_ds']['train_path'].get(), True, 0, False, classifier_params['attributes_to_use'])
     validate_obj = MarketDataset(
-        config['market_1501_ds']['train_path'].get(), True, 1, False)
+        config['market_1501_ds']['train_path'].get(), True, 1, False, classifier_params['attributes_to_use'])
+
     torch_ds_test = torch.utils.data.DataLoader(test_obj,
                                                 batch_size=2, num_workers=8,
                                                 collate_fn=collate_fn)
@@ -101,29 +124,23 @@ if __name__ == "__main__":
     torch_ds_val = torch.utils.data.DataLoader(validate_obj,
                                                batch_size=2, num_workers=8,
                                                collate_fn=collate_fn)
+
     #test_data = iter(torch_ds_test)
     #print(f"Count of test: {len(test_data)}")
-    # train_data = iter(torch_ds_train)
-    # attrs = []
-    # for img, attr in torch_ds_train:
-    #     attrs.append(attr)
-    # print(attrs[len(attrs) - 1])
-    # print(f"Count of train: {len(train_data)}")
-    # validate_data = iter(torch_ds_val)
-    # print(f"Count of validate: {len(validate_data)}")
+    #train_data = iter(torch_ds_train)
+    #print(f"Count of train: {len(train_data)}")
+    #validate_data = iter(torch_ds_val)
+    #print(f"Count of validate: {len(validate_data)}")
+
     # Parameters for loop:
     backbone = resnet_fpn_backbone(
         'resnet50', pretrained=True, trainable_layers=0)
-    cfg = confuse.Configuration('model_architecture', __name__, read=False)
-    cfg.set_file(
-        "C:\\Users\\netra\\GithubEncm369\\reid\\explainable-id-reid\\src\\model_util\\classifier_architecture.yml")
-    classifier_params = cfg.get()
     # The second argument is the output being used as a String,
     # "1", "2", "3", or "pool"
     from model_util.model2 import Classifier
     from model_util.model2 import OverallModel
-    obj = Classifier(classifier_params, "3")
-    model = OverallModel(backbone, obj, "3")
+    obj = Classifier(classifier_params, "2")
+    model = OverallModel(backbone, obj, "2")
     # for param in model.parameters():
     #    param.requires_grad = True
     for k, v in model.named_parameters():
@@ -133,6 +150,6 @@ if __name__ == "__main__":
     epochs = 20
     device = torch.device(
         'cuda') if torch.cuda.is_available() else torch.device('cpu')
-    training_loop(torch_ds_train, torch_ds_val,
-                  optimizer, device, model, epochs)
+    training_loop(torch_ds_train, torch_ds_val, optimizer, device,
+                  model, classifier_params['attributes_to_use'], epochs)
     print('Finished Training')
