@@ -14,6 +14,8 @@ import matplotlib.pyplot as plt
 from torch.utils.tensorboard import SummaryWriter
 from sklearn.metrics import precision_recall_fscore_support
 from sklearn.metrics import confusion_matrix
+from sklearn.metrics import accuracy_score
+from sklearn.metrics import classification_report
 
 import warnings
 warnings.simplefilter(action='ignore', category=FutureWarning)
@@ -46,13 +48,6 @@ class OverallModel(nn.Module):
         target_outputs = {}
         if len(targets) >= 2:
             for attr in targets[0].keys():
-                status = True
-                for idx in range(len(targets)):
-                    if attr not in targets[idx].keys():
-                        status = False
-                        break
-                if status == False:
-                    continue
                 target_list = []
                 for index in range(len(targets)):
                     target_list.append(targets[index][attr])
@@ -78,7 +73,7 @@ class OverallModel(nn.Module):
                     output_dict[attribute] = self.loss_layers[attribute](output[attribute], target_outputs[attribute])
         return output, output_dict
 
-def metric_calculator(y_pred, y_true, classifier_params):
+def metric_calculator(pred_and_true, classifier_params, epoch):
     metrics = {}
     predictions = {}
     real = {}
@@ -88,73 +83,36 @@ def metric_calculator(y_pred, y_true, classifier_params):
         real[attr] = []
         metrics[attr] = 0
     
-    for t in y_pred:
+    for t in pred_and_true:
         for attr in classifier_params:
             if attr == 'age' or attr == 'up_colours' or attr == 'down_colours':
-                to_add = torch.argmax(t[attr], dim = 1)
+                to_add = torch.argmax(t[0][attr], dim = 1)
                 predictions[attr].append(to_add)
+                real[attr].append(t[1][attr])
             else:
-                predictions[attr].append(t[attr])
+                predictions[attr].append(t[0][attr])
+                real[attr].append(t[1][attr])
 
     for attr in predictions:
         predictions[attr] = torch.stack(tuple(predictions[attr]))
-    
-    for t in y_true:
-        for attr in classifier_params:
-            real[attr].append(t[attr])
 
     for attr in real:
-        real[attr] = torch.stack(tuple(real[attr]))
-
-    this = torch.flatten(real['age'])
-    that = torch.flatten(predictions['age'])
-    print(torch.flatten(real[attr]).shape)
-    print(torch.round(torch.flatten(predictions[attr]).type(torch.float)).shape)
-
+        real[attr] = torch.stack(tuple(real[attr]))    
+    
     for attr in metrics:
         if attr != 'age' and attr != 'down_colours' and attr != 'up_colours':
-            precision, recall, fscore, _ = precision_recall_fscore_support(torch.flatten(real[attr]), torch.round(torch.flatten(predictions[attr]).type(torch.float)), average = 'weighted')
-            metrics[attr] = {'precision': precision, 'recall': recall}
+            precision, recall, _, _ = precision_recall_fscore_support(torch.flatten(real[attr]), torch.round(torch.flatten(predictions[attr]).type(torch.float)), average = 'macro')
+            accuracy = accuracy_score(torch.flatten(real[attr]), torch.round(torch.flatten(predictions[attr]).type(torch.float)))
+            metrics[attr] = {'precision': precision, 'recall': recall, 'accuracy': accuracy}
         else:
             conf = confusion_matrix(torch.flatten(real[attr]), torch.round(torch.flatten(predictions[attr]).type(torch.float)))
-            print(type(conf))
-            plt.imshow(conf, cmap='binary', interpolation='None')
-            plt.show()
-        
-    print(metrics)
-    #for t in y_true:
-    #    print(t)
-
-    #print(predictions['age'])
-    #print(real['age'])
-    #print(predictions['gender'])
-    #print(real['gender'])
-
-        # y_pred_copy = {}
-        # for attr in y_pred:
-        #     y_pred_copy[attr] = y_pred[attr]
-        # print(id(y_pred) == id(y_pred_copy))
-        # for attr in y_pred:
-        #     if attr != 'age' and attr != 'up_colours' and attr != 'down_colours':
-        #         y_pred_copy[attr] = torch.round(y_pred[attr])
-        # for attr in y_pred_copy:
-        #     if attr == 'age' or attr == 'up_colours' or attr == 'down_colours':
-        #         precision, recall, fscore, _ = precision_recall_fscore_support(torch.flatten(torch.stack(tuple(t[attr] for t in y_true))).tolist(), torch.argmax(y_pred_copy[attr], dim = 1).tolist(), average = 'micro')
-        #         accuracy = accuracy_score(torch.flatten(torch.stack(tuple(t[attr] for t in y_true))).tolist(), torch.argmax(y_pred_copy[attr], dim = 1).tolist())
-        #         metrics[attr] = {'recall': recall,
-        #                         'precision': precision,
-        #                         'fscore': fscore,
-        #                         'accuracy': accuracy}
-        #     else:
-        #         precision, recall, fscore, _ = precision_recall_fscore_support(torch.flatten(torch.stack(tuple(t[attr] for t in y_true))).tolist(), torch.flatten(y_pred_copy[attr]).tolist(), average = 'micro')
-        #         accuracy = accuracy_score(torch.flatten(torch.stack(tuple(t[attr] for t in y_true))).tolist(), torch.flatten(y_pred_copy[attr]).tolist())
-        #         metrics[attr] = {'recall': recall,
-        #                         'precision': precision,
-        #                         'fscore': fscore,
-        #                         'accuracy': accuracy}
-
-        # return metrics
-
+            print(f"\nEPOCH: {epoch}")
+            print(conf)
+            print(classification_report(torch.flatten(real[attr]), torch.round(torch.flatten(predictions[attr]).type(torch.float)), digits=3))
+            print("\n")
+            precision, recall, _, _ = precision_recall_fscore_support(torch.flatten(real[attr]), torch.round(torch.flatten(predictions[attr]).type(torch.float)), average = 'macro')
+            metrics[attr] = {'precision': precision, 'recall': recall}      
+    return metrics
 
 class Classifier(nn.Module):
     # configurable, default activation layer is ReLU, but can be changed. Default setting for dropout
@@ -220,9 +178,8 @@ def collate_fn(batch):
     return tuple(zip(*batch))
 
 
-def validation_loop(validation_ds, device, model, classifier_params):
-    predictions = []
-    target_list_input = []
+def validation_loop(validation_ds, device, model, classifier_params, epoch):
+    predictions_and_real = []
     step_counter = 0
     with torch.no_grad():
         for data in tqdm(iter(validation_ds)):
@@ -237,8 +194,7 @@ def validation_loop(validation_ds, device, model, classifier_params):
                 target_attrs[attr] = torch.stack(tuple(target_list))
             images = torch.stack(images)
             output, losses = model(images, targets)
-            predictions.append(output)
-            target_list_input.append(target_attrs)
+            predictions_and_real.append((output, target_attrs))
             if losses == False:
                 continue
             loss = torch.Tensor([0])
@@ -249,14 +205,16 @@ def validation_loop(validation_ds, device, model, classifier_params):
             print(f"Validation Overall Loss: {loss}")
             writer.add_scalar("Validation Overall Loss", loss, step_counter)
             step_counter += 1
-        metric_calculator(predictions, target_list_input, classifier_params)
+        metrics = metric_calculator(predictions_and_real, classifier_params, epoch)
+        for attr in metrics:
+            for metric in metrics:
+                writer.add_scalar(f"{attr} {metric}", metrics[attr][metric], epoch)
 
 
 def training_loop(torch_ds, validation_ds, optimizer, device, model, classifier_params, epochs=20):
     step_counter = 0
     for i in range(epochs):
         for data in tqdm(iter(torch_ds)):
-            break
             # get the inputs; data is a list of [inputs, labels]
             inputs, labels = data
             optimizer.zero_grad()
@@ -279,8 +237,7 @@ def training_loop(torch_ds, validation_ds, optimizer, device, model, classifier_
             optimizer.step()
             step_counter += 1
         print("DONE")
-        validation_loop(validation_ds, device, model, classifier_params)
-        break
+        validation_loop(validation_ds, device, model, classifier_params, i)
         torch.save({'model': model.state_dict(),
                     'optimizer': optimizer.state_dict()
                     }, str(i).zfill(3) + "resnet50_fpn_frcnn_full.tar")
