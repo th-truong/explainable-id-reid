@@ -24,11 +24,12 @@ torch.autograd.set_detect_anomaly(True)
 
 
 class OverallModel(nn.Module):
-    def __init__(self, backbone, classifier, output_to_use):
+    def __init__(self, backbone, classifier, output_to_use, device):
         super(OverallModel, self).__init__()
         self.backbone = backbone
         self.classifier = classifier
         self.output_to_use = output_to_use
+        self.device = device
         self.loss_layers = nn.ModuleDict({'age': nn.CrossEntropyLoss(),
                                           'backpack': nn.BCELoss(),
                                           'bag': nn.BCELoss(),
@@ -44,7 +45,8 @@ class OverallModel(nn.Module):
 
     def forward(self, input, targets):
         back_out = self.backbone(input)
-        output = self.classifier(back_out[self.output_to_use])
+        backbone_out = back_out[self.output_to_use].to(self.device)
+        output = self.classifier(backbone_out)
         target_outputs = {}
         if len(targets) >= 2:
             for attr in targets[0].keys():
@@ -73,7 +75,7 @@ class OverallModel(nn.Module):
                     output_dict[attribute] = self.loss_layers[attribute](output[attribute], target_outputs[attribute])
         return output, output_dict
 
-def metric_calculator(pred_and_true, classifier_params, epoch):
+def metric_calculator(pred_and_true, classifier_params, epoch, device):
     metrics = {}
     predictions = {}
     real = {}
@@ -94,32 +96,33 @@ def metric_calculator(pred_and_true, classifier_params, epoch):
                 real[attr].append(t[1][attr])
 
     for attr in predictions:
-        predictions[attr] = torch.stack(tuple(predictions[attr]))
+        predictions[attr] = torch.stack(tuple(predictions[attr])).to(device)
 
     for attr in real:
-        real[attr] = torch.stack(tuple(real[attr]))    
+        real[attr] = torch.stack(tuple(real[attr])).to(device)
     
     for attr in metrics:
         if attr != 'age' and attr != 'down_colours' and attr != 'up_colours':
-            precision, recall, _, _ = precision_recall_fscore_support(torch.flatten(real[attr]), torch.round(torch.flatten(predictions[attr]).type(torch.float)), average = 'macro')
-            accuracy = accuracy_score(torch.flatten(real[attr]), torch.round(torch.flatten(predictions[attr]).type(torch.float)))
+            precision, recall, _, _ = precision_recall_fscore_support(torch.flatten(real[attr].cpu()), torch.round(torch.flatten(predictions[attr].cpu()).type(torch.float)), average = 'macro')
+            accuracy = accuracy_score(torch.flatten(real[attr].cpu()), torch.round(torch.flatten(predictions[attr].cpu()).type(torch.float)))
             metrics[attr] = {'precision': precision, 'recall': recall, 'accuracy': accuracy}
         else:
-            conf = confusion_matrix(torch.flatten(real[attr]), torch.round(torch.flatten(predictions[attr]).type(torch.float)))
+            conf = confusion_matrix(torch.flatten(real[attr].cpu()), torch.round(torch.flatten(predictions[attr].cpu()).type(torch.float)))
             print(f"\nEPOCH: {epoch}")
             print(conf)
-            print(classification_report(torch.flatten(real[attr]), torch.round(torch.flatten(predictions[attr]).type(torch.float)), digits=3))
+            print(classification_report(torch.flatten(real[attr].cpu()), torch.round(torch.flatten(predictions[attr].cpu()).type(torch.float)), digits=3))
             print("\n")
-            precision, recall, _, _ = precision_recall_fscore_support(torch.flatten(real[attr]), torch.round(torch.flatten(predictions[attr]).type(torch.float)), average = 'macro')
+            precision, recall, _, _ = precision_recall_fscore_support(torch.flatten(real[attr].cpu()), torch.round(torch.flatten(predictions[attr].cpu()).type(torch.float)), average = 'macro')
             metrics[attr] = {'precision': precision, 'recall': recall}      
     return metrics
 
 class Classifier(nn.Module):
     # configurable, default activation layer is ReLU, but can be changed. Default setting for dropout
     # is False (not included), but can do so
-    def __init__(self, classifier_params, backbone_output):
+    def __init__(self, classifier_params, backbone_output, device):
         super().__init__()
         layers_to_add = classifier_params["hidden_layers"]
+        self.device = device
         self.layers = nn.ModuleList()
         linear_counter = 0
         for layer in layers_to_add:
@@ -149,28 +152,29 @@ class Classifier(nn.Module):
         for layer in layers_to_add:
             if layer['attribute'] in layers_to_use:
                 if layer['type'] == 'linear':
-                    linear = nn.Linear(**layer['kwargs'])
+                    linear = nn.Linear(**layer['kwargs']).cuda()
                 if layer['activation'] == 'softmax':
-                    activation = nn.Softmax(dim=None)
+                    activation = nn.Softmax(dim=None).cuda()
                 elif layer['activation'] == 'sigmoid':
-                    activation = nn.Sigmoid()
+                    activation = nn.Sigmoid().cuda()
                 if activation == None:
                     self.attribute_layers_dict[layer['attribute']] = nn.Sequential(
-                        linear)
+                        linear).cuda()
                 else:
                     self.attribute_layers_dict[layer['attribute']] = nn.Sequential(
-                        linear, activation)
+                        linear, activation).cuda()
 
     def forward(self, backbone_output):
         x = backbone_output
-        x = torch.flatten(x, start_dim=1)
+        x = torch.flatten(x, start_dim=1).to(self.device)
         for layer in self.layers:
-            x = layer(x)
+            x = layer(x).to(self.device)
 
         attribute_predictions = {}
         for attr_key in list(self.attribute_layers_dict.keys()):
             attribute_predictions[attr_key] = self.attribute_layers_dict[attr_key](
-                x)
+                x).to(self.device)
+
         return attribute_predictions
 
 
@@ -180,7 +184,7 @@ def collate_fn(batch):
 
 def validation_loop(validation_ds, device, model, classifier_params, epoch):
     predictions_and_real = []
-    step_counter = 0
+    model.eval()
     with torch.no_grad():
         for data in tqdm(iter(validation_ds)):
             inputs, labels = data
@@ -191,24 +195,16 @@ def validation_loop(validation_ds, device, model, classifier_params, epoch):
                 target_list = []
                 for index in range(len(targets)):
                     target_list.append(targets[index][attr])
-                target_attrs[attr] = torch.stack(tuple(target_list))
+                target_attrs[attr] = torch.stack(tuple(target_list)).to(device)
             images = torch.stack(images)
-            output, losses = model(images, targets)
+            images = images.to(device)
+            output, _ = model(images, targets)
             predictions_and_real.append((output, target_attrs))
-            if losses == False:
-                continue
-            loss = torch.Tensor([0])
-            for attr in losses:
-                loss = loss + losses[attr].item()
-                print(f"Validation: Attr: {attr} || Loss: {losses[attr].item()}")
-                writer.add_scalar(f"{attr} Loss/Validation", losses[attr].item(), step_counter)
-            print(f"Validation Overall Loss: {loss}")
-            writer.add_scalar("Validation Overall Loss", loss, step_counter)
-            step_counter += 1
-        metrics = metric_calculator(predictions_and_real, classifier_params, epoch)
+        metrics = metric_calculator(predictions_and_real, classifier_params, epoch, device)
         for attr in metrics:
             for metric in metrics[attr]:
                 writer.add_scalar(f"{attr} {metric}", metrics[attr][metric], epoch)
+    model.train()
 
 
 def training_loop(torch_ds, validation_ds, optimizer, device, model, classifier_params, epochs=20):
@@ -221,19 +217,18 @@ def training_loop(torch_ds, validation_ds, optimizer, device, model, classifier_
             images = list(image.to(device) for image in inputs)
             targets = [{k: v.to(device) for k, v in t.items()} for t in labels]
             images = torch.stack(images)
+            images = images.to(device)
             _,output = model(images, targets)
             if output == False:
                 continue
-            print("\n\n")
-            loss = torch.Tensor([0])
-            loss.requires_grad = True
+            total_loss = sum([attr_loss for attr_loss in output.values()])
             for attr in output:
-                loss = loss + output[attr].item()
-                print(f"Training: Attr: {attr} || Loss: {output[attr].item()}")
+            #    loss = loss + output[attr].item()
+                #print(f"Training: Attr: {attr} || Loss: {output[attr].item()}")
                 writer.add_scalar(f"{attr} Loss/train", output[attr].item(), step_counter)
-            print(f"Training: Overall Loss: {loss}")
-            writer.add_scalar("Training Overall Loss", loss, step_counter)
-            loss.backward()
+            #print(f"Training: Overall Loss: {total_loss}")
+            writer.add_scalar("Training Overall Loss", total_loss, step_counter)
+            total_loss.backward()
             optimizer.step()
             step_counter += 1
         print("DONE")
@@ -247,6 +242,9 @@ def training_loop(torch_ds, validation_ds, optimizer, device, model, classifier_
 
 if __name__ == "__main__":
     writer = SummaryWriter()
+    device = torch.device(
+        'cuda') if torch.cuda.is_available() else torch.device('cpu')
+
     config = confuse.Configuration('market1501', __name__)
     config.set_file(Path(
         r"C:\\Users\\Div\\Desktop\\Research\\reid\\reid\\explainable-id-reid\\src\\dataset_util\\market1501.yml"))
@@ -264,13 +262,13 @@ if __name__ == "__main__":
         config['market_1501_ds']['train_path'].get(), True, 1, False, classifier_params['attributes_to_use'])
 
     torch_ds_test = torch.utils.data.DataLoader(test_obj,
-                                                batch_size=2, num_workers=8,
+                                                batch_size=2, num_workers=4,
                                                 collate_fn=collate_fn)
     torch_ds_train = torch.utils.data.DataLoader(train_obj,
-                                                 batch_size=2, num_workers=8,
+                                                 batch_size=2, num_workers=4,
                                                  collate_fn=collate_fn)
     torch_ds_val = torch.utils.data.DataLoader(validate_obj,
-                                               batch_size=2, num_workers=8,
+                                               batch_size=2, num_workers=4,
                                                collate_fn=collate_fn)
 
     #test_data = iter(torch_ds_test)
@@ -283,19 +281,18 @@ if __name__ == "__main__":
     # Parameters for loop:
     backbone = resnet_fpn_backbone(
         'resnet50', pretrained=True, trainable_layers=0)
+    backbone = backbone.to(device)
     # The second argument is the output being used as a String,
     # "1", "2", "3", or "pool"
-    obj = Classifier(classifier_params, "2")
-    model = OverallModel(backbone, obj, "2")
+    obj = Classifier(classifier_params, "2", device)
+    model = OverallModel(backbone, obj, "2", device)
     #for param in model.parameters():
     #    param.requires_grad = True
     for k,v in model.named_parameters():
         print('{}: {}'.format(k, v.requires_grad))
     model = model.train()
-    optimizer = optim.SGD(obj.parameters(), lr=0.00002, momentum=0.9)
-    epochs = 20
-    device = torch.device(
-        'cuda') if torch.cuda.is_available() else torch.device('cpu')
+    optimizer = optim.SGD(obj.parameters(), lr=0.001, momentum=0.9)
+    epochs = 6
     model = model.to(device)
     print(next(model.parameters()).device)
     print("CUDA Availability: ", torch.cuda.is_available())
