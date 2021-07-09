@@ -207,7 +207,7 @@ def validation_loop(validation_ds, device, model, classifier_params, epoch):
             step_counter += 1
         metrics = metric_calculator(predictions_and_real, classifier_params, epoch)
         for attr in metrics:
-            for metric in metrics:
+            for metric in metrics[attr]:
                 writer.add_scalar(f"{attr} {metric}", metrics[attr][metric], epoch)
 
 
@@ -292,9 +292,12 @@ if __name__ == "__main__":
     for k,v in model.named_parameters():
         print('{}: {}'.format(k, v.requires_grad))
     model = model.train()
-    optimizer = optim.SGD(obj.parameters(), lr=0.001, momentum=0.9)
+    optimizer = optim.SGD(obj.parameters(), lr=0.00002, momentum=0.9)
     epochs = 20
     device = torch.device(
         'cuda') if torch.cuda.is_available() else torch.device('cpu')
+    model = model.to(device)
+    print(next(model.parameters()).device)
+    print("CUDA Availability: ", torch.cuda.is_available())
     training_loop(torch_ds_train, torch_ds_val, optimizer, device, model, classifier_params['attributes_to_use'], epochs)
     print('Finished Training')
