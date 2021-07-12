@@ -104,9 +104,11 @@ def metric_calculator(pred_and_true, classifier_params, epoch, device):
     
     for attr in metrics:
         if attr != 'age' and attr != 'down_colours' and attr != 'up_colours':
+            conf = confusion_matrix(torch.flatten(real[attr].cpu()), torch.round(torch.flatten(predictions[attr].cpu()).type(torch.float)))
+            tn, fp, fn, tp = conf.ravel()
             precision, recall, _, _ = precision_recall_fscore_support(torch.flatten(real[attr].cpu()), torch.round(torch.flatten(predictions[attr].cpu()).type(torch.float)), average = 'macro')
             accuracy = accuracy_score(torch.flatten(real[attr].cpu()), torch.round(torch.flatten(predictions[attr].cpu()).type(torch.float)))
-            metrics[attr] = {'precision': precision, 'recall': recall, 'accuracy': accuracy}
+            metrics[attr] = {'precision': precision, 'recall': recall, 'accuracy': accuracy, 'sensitivity': tp/(tp + fn), 'specificity': tn/(tn + fp)}
         else:
             conf = confusion_matrix(torch.flatten(real[attr].cpu()), torch.round(torch.flatten(predictions[attr].cpu()).type(torch.float)))
             print(f"\nEPOCH: {epoch}")
@@ -115,6 +117,7 @@ def metric_calculator(pred_and_true, classifier_params, epoch, device):
             print("\n")
             precision, recall, _, _ = precision_recall_fscore_support(torch.flatten(real[attr].cpu()), torch.round(torch.flatten(predictions[attr].cpu()).type(torch.float)), average = 'macro')
             metrics[attr] = {'precision': precision, 'recall': recall}      
+    print(metrics)
     return metrics
 
 class Classifier(nn.Module):
@@ -271,6 +274,9 @@ if __name__ == "__main__":
         config['market_1501_ds']['train_path'].get(), True, 0, False, architecture['attributes_to_use'])
     validate_obj = MarketDataset(
         config['market_1501_ds']['train_path'].get(), True, 1, False, architecture['attributes_to_use'])
+
+    print(len(train_obj.identities))
+    print(len(validate_obj.identities))
 
     torch_ds_test = torch.utils.data.DataLoader(test_obj,
                                                 batch_size=architecture['dataloader']['kwargs']['batch_size'], 
