@@ -295,8 +295,8 @@ if __name__ == "__main__":
     backbone = backbone.to(device)
     # The second argument is the output being used as a String,
     # "1", "2", "3", or "pool"
-    obj = Classifier(architecture, "3", device)
-    model = OverallModel(backbone, obj, "3", device)
+    obj = Classifier(architecture, str(architecture['backbone_output_to_use']), device)
+    model = OverallModel(backbone, obj, str(architecture['backbone_output_to_use']), device)
     #for param in model.parameters():
     #    param.requires_grad = True
     for k,v in model.named_parameters():
