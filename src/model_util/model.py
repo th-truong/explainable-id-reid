@@ -273,13 +273,16 @@ if __name__ == "__main__":
         config['market_1501_ds']['train_path'].get(), True, 1, False, architecture['attributes_to_use'])
 
     torch_ds_test = torch.utils.data.DataLoader(test_obj,
-                                                batch_size=2, num_workers=4,
+                                                batch_size=architecture['dataloader']['kwargs']['batch_size'], 
+                                                num_workers=architecture['dataloader']['kwargs']['num_workers'],
                                                 collate_fn=collate_fn)
     torch_ds_train = torch.utils.data.DataLoader(train_obj,
-                                                 batch_size=2, num_workers=4,
+                                                 batch_size=architecture['dataloader']['kwargs']['batch_size'], 
+                                                 num_workers=architecture['dataloader']['kwargs']['num_workers'],
                                                  collate_fn=collate_fn)
     torch_ds_val = torch.utils.data.DataLoader(validate_obj,
-                                               batch_size=2, num_workers=4,
+                                               batch_size=architecture['dataloader']['kwargs']['batch_size'], 
+                                               num_workers=architecture['dataloader']['kwargs']['num_workers'],
                                                collate_fn=collate_fn)
 
     #test_data = iter(torch_ds_test)
@@ -303,9 +306,8 @@ if __name__ == "__main__":
         print('{}: {}'.format(k, v.requires_grad))
     model = model.train()
     optimizer = optim.SGD(obj.parameters(), lr = architecture['optimizer']['kwargs']['lr'], momentum = architecture['optimizer']['kwargs']['momentum'])
-    epochs = 4
     model = model.to(device)
     print(next(model.parameters()).device)
     print("CUDA Availability: ", torch.cuda.is_available())
-    training_loop(torch_ds_train, torch_ds_val, optimizer, device, model, architecture['attributes_to_use'], epochs)
+    training_loop(torch_ds_train, torch_ds_val, optimizer, device, model, architecture['attributes_to_use'], architecture['epochs'])
     print('Finished Training')
