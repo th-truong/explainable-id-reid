@@ -76,6 +76,7 @@ class OverallModel(nn.Module):
         return output, output_dict
 
 def metric_calculator(pred_and_true, classifier_params, epoch, device):
+    print(pred_and_true)
     metrics = {}
     predictions = {}
     real = {}
@@ -120,7 +121,7 @@ class Classifier(nn.Module):
     # configurable, default activation layer is ReLU, but can be changed. Default setting for dropout
     # is False (not included), but can do so
     def __init__(self, classifier_params, backbone_output, device):
-        super().__init__()
+        super(Classifier, self).__init__()
         layers_to_add = classifier_params["hidden_layers"]
         self.device = device
         self.layers = nn.ModuleList()
@@ -142,27 +143,26 @@ class Classifier(nn.Module):
                 self.layers.append(nn.ReLU(**layer['kwargs']))
             elif layer['type'] == 'dropout':
                 self.layers.append(nn.Dropout(**layer['kwargs']))
-        self.attribute_classifier(classifier_params)
+        self.classify_layers = self.attribute_classifier(classifier_params)
 
     def attribute_classifier(self, classifier_params):
         layers_to_add = classifier_params["attribute_classification_layers"]
         layers_to_use = classifier_params["attributes_to_use"]
-        self.attribute_layers_dict = {}
-        activation = None
+        attribute_layers_dict = nn.ModuleDict()
         for layer in layers_to_add:
+            activation = None
             if layer['attribute'] in layers_to_use:
                 if layer['type'] == 'linear':
-                    linear = nn.Linear(**layer['kwargs']).cuda()
+                    linear = nn.Linear(**layer['kwargs'])
                 if layer['activation'] == 'softmax':
-                    activation = nn.Softmax(dim=None).cuda()
+                    activation = nn.Softmax(dim=None)
                 elif layer['activation'] == 'sigmoid':
-                    activation = nn.Sigmoid().cuda()
+                    activation = nn.Sigmoid()
                 if activation == None:
-                    self.attribute_layers_dict[layer['attribute']] = nn.Sequential(
-                        linear).cuda()
+                    attribute_layers_dict[layer['attribute']] = linear
                 else:
-                    self.attribute_layers_dict[layer['attribute']] = nn.Sequential(
-                        linear, activation).cuda()
+                    attribute_layers_dict[layer['attribute']] = nn.Sequential(linear, activation)
+        return attribute_layers_dict
 
     def forward(self, backbone_output):
         x = backbone_output
@@ -171,9 +171,9 @@ class Classifier(nn.Module):
             x = layer(x).to(self.device)
 
         attribute_predictions = {}
-        for attr_key in list(self.attribute_layers_dict.keys()):
-            attribute_predictions[attr_key] = self.attribute_layers_dict[attr_key](
-                x).to(self.device)
+        for attr_key in list(self.classify_layers.keys()):
+            y = self.classify_layers[attr_key](x).to(self.device)
+            attribute_predictions[attr_key] = y.to(self.device)
 
         return attribute_predictions
 
@@ -199,12 +199,15 @@ def validation_loop(validation_ds, device, model, classifier_params, epoch):
             images = torch.stack(images)
             images = images.to(device)
             output, _ = model(images, targets)
+            if model.training == True:
+                print("Training")
+            else:
+                print("Eval")
             predictions_and_real.append((output, target_attrs))
         metrics = metric_calculator(predictions_and_real, classifier_params, epoch, device)
         for attr in metrics:
             for metric in metrics[attr]:
                 writer.add_scalar(f"{attr} {metric}", metrics[attr][metric], epoch)
-    model.train()
 
 
 def training_loop(torch_ds, validation_ds, optimizer, device, model, classifier_params, epochs=20):
@@ -218,7 +221,12 @@ def training_loop(torch_ds, validation_ds, optimizer, device, model, classifier_
             targets = [{k: v.to(device) for k, v in t.items()} for t in labels]
             images = torch.stack(images)
             images = images.to(device)
+            print(torch.cuda.is_available())
             _,output = model(images, targets)
+            if model.training == True:
+                print("Training")
+            else:
+                print("Eval")
             if output == False:
                 continue
             total_loss = sum([attr_loss for attr_loss in output.values()])
@@ -226,13 +234,16 @@ def training_loop(torch_ds, validation_ds, optimizer, device, model, classifier_
             #    loss = loss + output[attr].item()
                 #print(f"Training: Attr: {attr} || Loss: {output[attr].item()}")
                 writer.add_scalar(f"{attr} Loss/train", output[attr].item(), step_counter)
-            #print(f"Training: Overall Loss: {total_loss}")
+                print(attr)
+            print(f"Training: Overall Loss: {total_loss}")
             writer.add_scalar("Training Overall Loss", total_loss, step_counter)
             total_loss.backward()
             optimizer.step()
             step_counter += 1
+        print(step_counter)
         print("DONE")
         validation_loop(validation_ds, device, model, classifier_params, i)
+        model.train()
         torch.save({'model': model.state_dict(),
                     'optimizer': optimizer.state_dict()
                     }, str(i).zfill(3) + "resnet50_fpn_frcnn_full.tar")
@@ -280,19 +291,19 @@ if __name__ == "__main__":
 
     # Parameters for loop:
     backbone = resnet_fpn_backbone(
-        'resnet50', pretrained=True, trainable_layers=0)
+        'resnet50', pretrained=True, trainable_layers=5)
     backbone = backbone.to(device)
     # The second argument is the output being used as a String,
     # "1", "2", "3", or "pool"
-    obj = Classifier(classifier_params, "2", device)
-    model = OverallModel(backbone, obj, "2", device)
+    obj = Classifier(classifier_params, "3", device)
+    model = OverallModel(backbone, obj, "3", device)
     #for param in model.parameters():
     #    param.requires_grad = True
     for k,v in model.named_parameters():
         print('{}: {}'.format(k, v.requires_grad))
     model = model.train()
-    optimizer = optim.SGD(obj.parameters(), lr=0.001, momentum=0.9)
-    epochs = 6
+    optimizer = optim.SGD(obj.parameters(), lr=0.0001, momentum=0.9)
+    epochs = 4
     model = model.to(device)
     print(next(model.parameters()).device)
     print("CUDA Availability: ", torch.cuda.is_available())
