@@ -262,15 +262,15 @@ if __name__ == "__main__":
     cfg = confuse.Configuration('model_architecture', __name__, read=False)
     cfg.set_file(
         "C:\\Users\\Div\\Desktop\\Research\\reid\\reid\\explainable-id-reid\\src\\model_util\\classifier_architecture.yml")
-    classifier_params = cfg.get()
+    architecture = cfg.get()
 
     from processor import MarketDataset
     test_obj = MarketDataset(
-        config['market_1501_ds']['test_path'].get(), True, 2, False, classifier_params['attributes_to_use'])
+        config['market_1501_ds']['test_path'].get(), True, 2, False, architecture['attributes_to_use'])
     train_obj = MarketDataset(
-        config['market_1501_ds']['train_path'].get(), True, 0, False, classifier_params['attributes_to_use'])
+        config['market_1501_ds']['train_path'].get(), True, 0, False, architecture['attributes_to_use'])
     validate_obj = MarketDataset(
-        config['market_1501_ds']['train_path'].get(), True, 1, False, classifier_params['attributes_to_use'])
+        config['market_1501_ds']['train_path'].get(), True, 1, False, architecture['attributes_to_use'])
 
     torch_ds_test = torch.utils.data.DataLoader(test_obj,
                                                 batch_size=2, num_workers=4,
@@ -291,21 +291,21 @@ if __name__ == "__main__":
 
     # Parameters for loop:
     backbone = resnet_fpn_backbone(
-        'resnet50', pretrained=True, trainable_layers=5)
+        **architecture['backbone']['kwargs'])
     backbone = backbone.to(device)
     # The second argument is the output being used as a String,
     # "1", "2", "3", or "pool"
-    obj = Classifier(classifier_params, "3", device)
+    obj = Classifier(architecture, "3", device)
     model = OverallModel(backbone, obj, "3", device)
     #for param in model.parameters():
     #    param.requires_grad = True
     for k,v in model.named_parameters():
         print('{}: {}'.format(k, v.requires_grad))
     model = model.train()
-    optimizer = optim.SGD(obj.parameters(), lr=0.0001, momentum=0.9)
+    optimizer = optim.SGD(obj.parameters(), lr = architecture['optimizer']['kwargs']['lr'], momentum = architecture['optimizer']['kwargs']['momentum'])
     epochs = 4
     model = model.to(device)
     print(next(model.parameters()).device)
     print("CUDA Availability: ", torch.cuda.is_available())
-    training_loop(torch_ds_train, torch_ds_val, optimizer, device, model, classifier_params['attributes_to_use'], epochs)
+    training_loop(torch_ds_train, torch_ds_val, optimizer, device, model, architecture['attributes_to_use'], epochs)
     print('Finished Training')
