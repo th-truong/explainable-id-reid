@@ -213,7 +213,7 @@ def validation_loop(validation_ds, device, model, classifier_params, epoch):
                 writer.add_scalar(f"{attr} {metric}", metrics[attr][metric], epoch)
 
 
-def training_loop(torch_ds, validation_ds, optimizer, device, model, classifier_params, epochs=20):
+def training_loop(torch_ds, validation_ds, optimizer, device, model, classifier_params, scheduler, epochs=20):
     step_counter = 0
     for i in range(epochs):
         for data in tqdm(iter(torch_ds)):
@@ -246,6 +246,7 @@ def training_loop(torch_ds, validation_ds, optimizer, device, model, classifier_
         print(step_counter)
         print("DONE")
         validation_loop(validation_ds, device, model, classifier_params, i)
+        scheduler.step()
         model.train()
         torch.save({'model': model.state_dict(),
                     'optimizer': optimizer.state_dict()
@@ -303,7 +304,8 @@ if __name__ == "__main__":
     model = model.train()
     optimizer = optim.SGD(obj.parameters(), lr = architecture['optimizer']['kwargs']['lr'], momentum = architecture['optimizer']['kwargs']['momentum'])
     model = model.to(device)
+    scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones = [architecture['scheduler']['kwargs']['milestones']], gamma = architecture['scheduler']['kwargs']['gamma'])
     print(next(model.parameters()).device)
     print("CUDA Availability: ", torch.cuda.is_available())
-    training_loop(torch_ds_train, torch_ds_val, optimizer, device, model, architecture['attributes_to_use'], architecture['epochs'])
+    training_loop(torch_ds_train, torch_ds_val, optimizer, device, model, architecture['attributes_to_use'], scheduler, architecture['epochs'])
     print('Finished Training')

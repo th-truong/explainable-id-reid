@@ -162,3 +162,8 @@ optimizer:
   kwargs:
     lr: 0.001
     momentum: 0.9
+
+scheduler:
+  kwargs:
+    milestones: 3
+    gamma: 0.1
