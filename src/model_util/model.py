@@ -275,9 +275,6 @@ if __name__ == "__main__":
     validate_obj = MarketDataset(
         config['market_1501_ds']['train_path'].get(), True, 1, False, architecture['attributes_to_use'])
 
-    print(len(train_obj.identities))
-    print(len(validate_obj.identities))
-
     torch_ds_test = torch.utils.data.DataLoader(test_obj,
                                                 batch_size=architecture['dataloader']['kwargs']['batch_size'], 
                                                 num_workers=architecture['dataloader']['kwargs']['num_workers'],
@@ -290,13 +287,6 @@ if __name__ == "__main__":
                                                batch_size=architecture['dataloader']['kwargs']['batch_size'], 
                                                num_workers=architecture['dataloader']['kwargs']['num_workers'],
                                                collate_fn=collate_fn)
-
-    #test_data = iter(torch_ds_test)
-    #print(f"Count of test: {len(test_data)}")
-    #train_data = iter(torch_ds_train)
-    #print(f"Count of train: {len(train_data)}")
-    #validate_data = iter(torch_ds_val)
-    #print(f"Count of validate: {len(validate_data)}")
 
     # Parameters for loop:
     backbone = resnet_fpn_backbone(
