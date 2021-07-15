@@ -7,19 +7,6 @@ hidden_layers:
       # For '3', 2048
       # For 'pool', 512
       in_features: 512
-      out_features: 256
-      bias: true
-  - type: relu_activation
-    kwargs:
-      inplace: false
-  - type: dropout
-    kwargs:
-      p: 0.5
-      inplace: true
-
-  - type: linear
-    kwargs:
-      in_features: 256
       out_features: 128
       bias: true
   - type: relu_activation
@@ -33,7 +20,20 @@ hidden_layers:
   - type: linear
     kwargs:
       in_features: 128
-      out_features: 256
+      out_features: 64
+      bias: true
+  - type: relu_activation
+    kwargs:
+      inplace: false
+  - type: dropout
+    kwargs:
+      p: 0.5
+      inplace: true
+
+  - type: linear
+    kwargs:
+      in_features: 64
+      out_features: 128
       bias: true
   - type: relu_activation
     kwargs:
@@ -48,7 +48,7 @@ attribute_classification_layers:
     attribute: age
     activation: none
     kwargs:
-      in_features: 256
+      in_features: 128
       out_features: 4
       bias: true
 
@@ -56,7 +56,7 @@ attribute_classification_layers:
     attribute: backpack
     activation: sigmoid
     kwargs:
-      in_features: 256
+      in_features: 128
       out_features: 1
       bias: true
 
@@ -64,7 +64,7 @@ attribute_classification_layers:
     attribute: bag
     activation: sigmoid
     kwargs:
-      in_features: 256
+      in_features: 128
       out_features: 1
       bias: true
 
@@ -72,7 +72,7 @@ attribute_classification_layers:
     attribute: clothes
     activation: sigmoid
     kwargs:
-      in_features: 256
+      in_features: 128
       out_features: 1
       bias: true
 
@@ -80,7 +80,7 @@ attribute_classification_layers:
     attribute: down
     activation: sigmoid
     kwargs:
-      in_features: 256
+      in_features: 128
       out_features: 1
       bias: true
 
@@ -88,7 +88,7 @@ attribute_classification_layers:
     attribute: down_colours
     activation: none
     kwargs:
-      in_features: 256
+      in_features: 128
       out_features: 9
       bias: true
 
@@ -96,7 +96,7 @@ attribute_classification_layers:
     attribute: gender
     activation: sigmoid
     kwargs:
-      in_features: 256
+      in_features: 128
       out_features: 1
       bias: true
 
@@ -104,7 +104,7 @@ attribute_classification_layers:
     attribute: hair
     activation: sigmoid
     kwargs:
-      in_features: 256
+      in_features: 128
       out_features: 1
       bias: true
 
@@ -112,7 +112,7 @@ attribute_classification_layers:
     attribute: handbag
     activation: sigmoid
     kwargs:
-      in_features: 256
+      in_features: 128
       out_features: 1
       bias: true
 
@@ -120,7 +120,7 @@ attribute_classification_layers:
     attribute: hat
     activation: sigmoid
     kwargs:
-      in_features: 256
+      in_features: 128
       out_features: 1
       bias: true
 
@@ -128,7 +128,7 @@ attribute_classification_layers:
     attribute: up
     activation: sigmoid
     kwargs:
-      in_features: 256
+      in_features: 128
       out_features: 1
       bias: true
 
@@ -136,7 +136,7 @@ attribute_classification_layers:
     attribute: up_colours
     activation: none
     kwargs:
-      in_features: 256
+      in_features: 128
       out_features: 8
       bias: true
 
@@ -146,7 +146,7 @@ attributes_to_use:
 dataloader:
   kwargs:
     batch_size: 2
-    num_workers: 4
+    num_workers: 8
 
 backbone:
   kwargs:
