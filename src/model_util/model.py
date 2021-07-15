@@ -38,43 +38,50 @@ class OverallModel(nn.Module):
             backpack_weight = [0.6714, 1.958]
             bag_weight = [0.6779, 1.9047]
             clothes_weight = [0.5773, 3.7333]
-            down_colours_weight = [0.2705, 0.7329, 1.0916, 0.6222, 4.7863, 2.9630, 62.2222, 1.3827, 7.7778]
+            down_weight = [0.844, 1.223]
+            gender_weight = [0.844, 1.223]
+            hair_weight = [0.733, 1.573]
             handbag_weight = [0.5668, 4.2424]
             hat_weight = [0.5137, 18.6666]
-            up_weight = 
-            up_colours_weight = 
+            up_weight = [0.525, 10.370]
+            down_colours_weight = [0.2705, 0.7329, 1.0916,
+                                   0.6222, 4.7863, 2.9630, 62.2222, 1.3827, 7.7778]
+            up_colours_weight =
         else:
             age_weight = [25, 0.2781, 2.7812, 22.25]
             backpack_weight = [0.7542, 1.4833]
             bag_weight = [0.5933, 3.1785]
             clothes_weight = [0.5933, 3.1785]
             down_weight = [0.7295, 1.5892]
-            down_colours_weight = []
+            gender_weight = [0.908, 1.113]
+            hair_weight = [0.795, 1.348]
             handbag_weight = [0.5426, 6.3571]
             hat_weight = [0.5361, 7.4166]
-            up_weight = 
+            up_weight = [0.536, 7.417]
+            down_colours_weight = [0.291, 0.471, 1.236,
+                                   0.761, 9.889, 2.472, 0, 1.413, 9.889]
             up_colours_weight =
 
         loss_layers = nn.ModuleDict({'age': nn.CrossEntropyLoss(),
-                                          'backpack': nn.BCELoss(),
-                                          'bag': nn.BCELoss(),
-                                          'clothes': nn.BCELoss(),
-                                          'down': nn.BCELoss(),
-                                          'down_colours': nn.CrossEntropyLoss(),
-                                          'gender': nn.BCELoss(),
-                                          'hair': nn.BCELoss(),
-                                          'handbag': nn.BCELoss(),
-                                          'hat': nn.BCELoss(),
-                                          'up': nn.BCELoss(),
-                                          'up_colours': nn.CrossEntropyLoss()})
+                                     'backpack': nn.BCELoss(),
+                                     'bag': nn.BCELoss(),
+                                     'clothes': nn.BCELoss(),
+                                     'down': nn.BCELoss(),
+                                     'down_colours': nn.CrossEntropyLoss(),
+                                     'gender': nn.BCELoss(),
+                                     'hair': nn.BCELoss(),
+                                     'handbag': nn.BCELoss(),
+                                     'hat': nn.BCELoss(),
+                                     'up': nn.BCELoss(),
+                                     'up_colours': nn.CrossEntropyLoss()})
         return loss_layers
-                                        
+
     def forward(self, input, targets):
         back_out = self.backbone(input)
         backbone_out = back_out[self.output_to_use].to(self.device)
-        if self.training:  
+        if self.training:
             loss_layers = self.loss_layers(True)
-        else: 
+        else:
             loss_layers = self.loss_layers(False)
         output = self.classifier(backbone_out)
         target_outputs = {}
@@ -84,7 +91,7 @@ class OverallModel(nn.Module):
                 for index in range(len(targets)):
                     target_list.append(targets[index][attr])
                 target_outputs[attr] = torch.stack(tuple(target_list))
-        else: 
+        else:
             target_outputs = targets[0]
             for attr in target_outputs:
                 target_outputs[attr] = target_outputs[attr].view(1)
@@ -93,17 +100,22 @@ class OverallModel(nn.Module):
             for attribute in target_outputs:
                 if str(type(loss_layers[attribute])) == "<class 'torch.nn.modules.loss.BCELoss'>":
                     for attr in target_outputs:
-                        target_outputs[attr] = target_outputs[attr].type(torch.float32)
+                        target_outputs[attr] = target_outputs[attr].type(
+                            torch.float32)
                     for attr in output:
                         output[attr] = output[attr].type(torch.float32)
-                    output_dict[attribute] = loss_layers[attribute](output[attribute], target_outputs[attribute].view(output[attribute].shape))
-                else: 
+                    output_dict[attribute] = loss_layers[attribute](
+                        output[attribute], target_outputs[attribute].view(output[attribute].shape))
+                else:
                     for attr in target_outputs:
-                        target_outputs[attr] = target_outputs[attr].type(torch.long)
+                        target_outputs[attr] = target_outputs[attr].type(
+                            torch.long)
                     for attr in output:
                         output[attr] = output[attr].type(torch.float32)
-                    output_dict[attribute] = loss_layers[attribute](output[attribute], target_outputs[attribute])
+                    output_dict[attribute] = loss_layers[attribute](
+                        output[attribute], target_outputs[attribute])
         return output, output_dict
+
 
 def metric_calculator(pred_and_true, classifier_params, epoch, device):
     print(pred_and_true)
@@ -115,11 +127,11 @@ def metric_calculator(pred_and_true, classifier_params, epoch, device):
         predictions[attr] = []
         real[attr] = []
         metrics[attr] = 0
-    
+
     for t in pred_and_true:
         for attr in classifier_params:
             if attr == 'age' or attr == 'up_colours' or attr == 'down_colours':
-                to_add = torch.argmax(t[0][attr], dim = 1)
+                to_add = torch.argmax(t[0][attr], dim=1)
                 predictions[attr].append(to_add)
                 real[attr].append(t[1][attr])
             else:
@@ -131,24 +143,32 @@ def metric_calculator(pred_and_true, classifier_params, epoch, device):
 
     for attr in real:
         real[attr] = torch.stack(tuple(real[attr])).to(device)
-    
+
     for attr in metrics:
         if attr != 'age' and attr != 'down_colours' and attr != 'up_colours':
-            conf = confusion_matrix(torch.flatten(real[attr].cpu()), torch.round(torch.flatten(predictions[attr].cpu()).type(torch.float)))
+            conf = confusion_matrix(torch.flatten(real[attr].cpu()), torch.round(
+                torch.flatten(predictions[attr].cpu()).type(torch.float)))
             tn, fp, fn, tp = conf.ravel()
-            precision, recall, _, _ = precision_recall_fscore_support(torch.flatten(real[attr].cpu()), torch.round(torch.flatten(predictions[attr].cpu()).type(torch.float)), average = 'macro')
-            accuracy = accuracy_score(torch.flatten(real[attr].cpu()), torch.round(torch.flatten(predictions[attr].cpu()).type(torch.float)))
-            metrics[attr] = {'precision': precision, 'recall': recall, 'accuracy': accuracy, 'sensitivity': tp/(tp + fn), 'specificity': tn/(tn + fp)}
+            precision, recall, _, _ = precision_recall_fscore_support(torch.flatten(real[attr].cpu(
+            )), torch.round(torch.flatten(predictions[attr].cpu()).type(torch.float)), average='macro')
+            accuracy = accuracy_score(torch.flatten(real[attr].cpu()), torch.round(
+                torch.flatten(predictions[attr].cpu()).type(torch.float)))
+            metrics[attr] = {'precision': precision, 'recall': recall, 'accuracy': accuracy,
+                             'sensitivity': tp/(tp + fn), 'specificity': tn/(tn + fp)}
         else:
-            conf = confusion_matrix(torch.flatten(real[attr].cpu()), torch.round(torch.flatten(predictions[attr].cpu()).type(torch.float)))
+            conf = confusion_matrix(torch.flatten(real[attr].cpu()), torch.round(
+                torch.flatten(predictions[attr].cpu()).type(torch.float)))
             print(f"\nEPOCH: {epoch}")
             print(conf)
-            print(classification_report(torch.flatten(real[attr].cpu()), torch.round(torch.flatten(predictions[attr].cpu()).type(torch.float)), digits=3))
+            print(classification_report(torch.flatten(real[attr].cpu()), torch.round(
+                torch.flatten(predictions[attr].cpu()).type(torch.float)), digits=3))
             print("\n")
-            precision, recall, _, _ = precision_recall_fscore_support(torch.flatten(real[attr].cpu()), torch.round(torch.flatten(predictions[attr].cpu()).type(torch.float)), average = 'macro')
-            metrics[attr] = {'precision': precision, 'recall': recall}      
+            precision, recall, _, _ = precision_recall_fscore_support(torch.flatten(real[attr].cpu(
+            )), torch.round(torch.flatten(predictions[attr].cpu()).type(torch.float)), average='macro')
+            metrics[attr] = {'precision': precision, 'recall': recall}
     print(metrics)
     return metrics
+
 
 class Classifier(nn.Module):
     # configurable, default activation layer is ReLU, but can be changed. Default setting for dropout
@@ -194,7 +214,8 @@ class Classifier(nn.Module):
                 if activation == None:
                     attribute_layers_dict[layer['attribute']] = linear
                 else:
-                    attribute_layers_dict[layer['attribute']] = nn.Sequential(linear, activation)
+                    attribute_layers_dict[layer['attribute']
+                                          ] = nn.Sequential(linear, activation)
         return attribute_layers_dict
 
     def forward(self, backbone_output):
@@ -233,10 +254,12 @@ def validation_loop(validation_ds, device, model, classifier_params, epoch):
             images = images.to(device)
             output, _ = model(images, targets)
             predictions_and_real.append((output, target_attrs))
-        metrics = metric_calculator(predictions_and_real, classifier_params, epoch, device)
+        metrics = metric_calculator(
+            predictions_and_real, classifier_params, epoch, device)
         for attr in metrics:
             for metric in metrics[attr]:
-                writer.add_scalar(f"{attr} {metric}", metrics[attr][metric], epoch)
+                writer.add_scalar(f"{attr} {metric}",
+                                  metrics[attr][metric], epoch)
 
 
 def training_loop(torch_ds, validation_ds, optimizer, device, model, classifier_params, scheduler, epochs=20):
@@ -250,17 +273,19 @@ def training_loop(torch_ds, validation_ds, optimizer, device, model, classifier_
             targets = [{k: v.to(device) for k, v in t.items()} for t in labels]
             images = torch.stack(images)
             images = images.to(device)
-            _,output = model(images, targets)
+            _, output = model(images, targets)
             if output == False:
                 continue
             total_loss = sum([attr_loss for attr_loss in output.values()])
             for attr in output:
-            #    loss = loss + output[attr].item()
+                #    loss = loss + output[attr].item()
                 #print(f"Training: Attr: {attr} || Loss: {output[attr].item()}")
-                writer.add_scalar(f"{attr} Loss/train", output[attr].item(), step_counter)
-                #print(attr)
+                writer.add_scalar(f"{attr} Loss/train",
+                                  output[attr].item(), step_counter)
+                # print(attr)
             #print(f"Training: Overall Loss: {total_loss}")
-            writer.add_scalar("Training Overall Loss", total_loss, step_counter)
+            writer.add_scalar("Training Overall Loss",
+                              total_loss, step_counter)
             total_loss.backward()
             optimizer.step()
             step_counter += 1
@@ -297,15 +322,15 @@ if __name__ == "__main__":
         config['market_1501_ds']['train_path'].get(), True, 1, False, architecture['attributes_to_use'])
 
     torch_ds_test = torch.utils.data.DataLoader(test_obj,
-                                                batch_size=architecture['dataloader']['kwargs']['batch_size'], 
+                                                batch_size=architecture['dataloader']['kwargs']['batch_size'],
                                                 num_workers=architecture['dataloader']['kwargs']['num_workers'],
                                                 collate_fn=collate_fn)
     torch_ds_train = torch.utils.data.DataLoader(train_obj,
-                                                 batch_size=architecture['dataloader']['kwargs']['batch_size'], 
+                                                 batch_size=architecture['dataloader']['kwargs']['batch_size'],
                                                  num_workers=architecture['dataloader']['kwargs']['num_workers'],
                                                  collate_fn=collate_fn)
     torch_ds_val = torch.utils.data.DataLoader(validate_obj,
-                                               batch_size=architecture['dataloader']['kwargs']['batch_size'], 
+                                               batch_size=architecture['dataloader']['kwargs']['batch_size'],
                                                num_workers=architecture['dataloader']['kwargs']['num_workers'],
                                                collate_fn=collate_fn)
 
@@ -315,17 +340,22 @@ if __name__ == "__main__":
     backbone = backbone.to(device)
     # The second argument is the output being used as a String,
     # "1", "2", "3", or "pool"
-    obj = Classifier(architecture, str(architecture['backbone_output_to_use']), device)
-    model = OverallModel(backbone, obj, str(architecture['backbone_output_to_use']), device)
-    #for param in model.parameters():
+    obj = Classifier(architecture, str(
+        architecture['backbone_output_to_use']), device)
+    model = OverallModel(backbone, obj, str(
+        architecture['backbone_output_to_use']), device)
+    # for param in model.parameters():
     #    param.requires_grad = True
-    for k,v in model.named_parameters():
+    for k, v in model.named_parameters():
         print('{}: {}'.format(k, v.requires_grad))
     model = model.train()
-    optimizer = optim.SGD(obj.parameters(), lr = architecture['optimizer']['kwargs']['lr'], momentum = architecture['optimizer']['kwargs']['momentum'])
+    optimizer = optim.SGD(obj.parameters(
+    ), lr=architecture['optimizer']['kwargs']['lr'], momentum=architecture['optimizer']['kwargs']['momentum'])
     model = model.to(device)
-    scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones = [architecture['scheduler']['kwargs']['milestones']], gamma = architecture['scheduler']['kwargs']['gamma'])
+    scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[
+                                                     architecture['scheduler']['kwargs']['milestones']], gamma=architecture['scheduler']['kwargs']['gamma'])
     print(next(model.parameters()).device)
     print("CUDA Availability: ", torch.cuda.is_available())
-    training_loop(torch_ds_train, torch_ds_val, optimizer, device, model, architecture['attributes_to_use'], scheduler, architecture['epochs'])
+    training_loop(torch_ds_train, torch_ds_val, optimizer, device, model,
+                  architecture['attributes_to_use'], scheduler, architecture['epochs'])
     print('Finished Training')
