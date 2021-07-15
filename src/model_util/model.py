@@ -16,6 +16,7 @@ from sklearn.metrics import precision_recall_fscore_support
 from sklearn.metrics import confusion_matrix
 from sklearn.metrics import accuracy_score
 from sklearn.metrics import classification_report
+from sklearn.utils.class_weight import compute_class_weight
 
 import warnings
 warnings.simplefilter(action='ignore', category=FutureWarning)
@@ -30,7 +31,31 @@ class OverallModel(nn.Module):
         self.classifier = classifier
         self.output_to_use = output_to_use
         self.device = device
-        self.loss_layers = nn.ModuleDict({'age': nn.CrossEntropyLoss(),
+
+    def loss_layers(self, training):
+        if training:
+            age_weight = [20, 0.3373, 1.0606, 23.3333]
+            backpack_weight = [0.6714, 1.958]
+            bag_weight = [0.6779, 1.9047]
+            clothes_weight = [0.5773, 3.7333]
+            down_colours_weight = [0.2705, 0.7329, 1.0916, 0.6222, 4.7863, 2.9630, 62.2222, 1.3827, 7.7778]
+            handbag_weight = [0.5668, 4.2424]
+            hat_weight = [0.5137, 18.6666]
+            up_weight = 
+            up_colours_weight = 
+        else:
+            age_weight = [25, 0.2781, 2.7812, 22.25]
+            backpack_weight = [0.7542, 1.4833]
+            bag_weight = [0.5933, 3.1785]
+            clothes_weight = [0.5933, 3.1785]
+            down_weight = [0.7295, 1.5892]
+            down_colours_weight = []
+            handbag_weight = [0.5426, 6.3571]
+            hat_weight = [0.5361, 7.4166]
+            up_weight = 
+            up_colours_weight =
+
+        loss_layers = nn.ModuleDict({'age': nn.CrossEntropyLoss(),
                                           'backpack': nn.BCELoss(),
                                           'bag': nn.BCELoss(),
                                           'clothes': nn.BCELoss(),
@@ -42,10 +67,15 @@ class OverallModel(nn.Module):
                                           'hat': nn.BCELoss(),
                                           'up': nn.BCELoss(),
                                           'up_colours': nn.CrossEntropyLoss()})
-
+        return loss_layers
+                                        
     def forward(self, input, targets):
         back_out = self.backbone(input)
         backbone_out = back_out[self.output_to_use].to(self.device)
+        if self.training:  
+            loss_layers = self.loss_layers(True)
+        else: 
+            loss_layers = self.loss_layers(False)
         output = self.classifier(backbone_out)
         target_outputs = {}
         if len(targets) >= 2:
@@ -61,18 +91,18 @@ class OverallModel(nn.Module):
         output_dict = {}
         if self.training:
             for attribute in target_outputs:
-                if str(type(self.loss_layers[attribute])) == "<class 'torch.nn.modules.loss.BCELoss'>":
+                if str(type(loss_layers[attribute])) == "<class 'torch.nn.modules.loss.BCELoss'>":
                     for attr in target_outputs:
                         target_outputs[attr] = target_outputs[attr].type(torch.float32)
                     for attr in output:
                         output[attr] = output[attr].type(torch.float32)
-                    output_dict[attribute] = self.loss_layers[attribute](output[attribute], target_outputs[attribute].view(output[attribute].shape))
+                    output_dict[attribute] = loss_layers[attribute](output[attribute], target_outputs[attribute].view(output[attribute].shape))
                 else: 
                     for attr in target_outputs:
                         target_outputs[attr] = target_outputs[attr].type(torch.long)
                     for attr in output:
                         output[attr] = output[attr].type(torch.float32)
-                    output_dict[attribute] = self.loss_layers[attribute](output[attribute], target_outputs[attribute])
+                    output_dict[attribute] = loss_layers[attribute](output[attribute], target_outputs[attribute])
         return output, output_dict
 
 def metric_calculator(pred_and_true, classifier_params, epoch, device):
@@ -202,10 +232,6 @@ def validation_loop(validation_ds, device, model, classifier_params, epoch):
             images = torch.stack(images)
             images = images.to(device)
             output, _ = model(images, targets)
-            if model.training == True:
-                print("Training")
-            else:
-                print("Eval")
             predictions_and_real.append((output, target_attrs))
         metrics = metric_calculator(predictions_and_real, classifier_params, epoch, device)
         for attr in metrics:
@@ -224,12 +250,7 @@ def training_loop(torch_ds, validation_ds, optimizer, device, model, classifier_
             targets = [{k: v.to(device) for k, v in t.items()} for t in labels]
             images = torch.stack(images)
             images = images.to(device)
-            print(torch.cuda.is_available())
             _,output = model(images, targets)
-            if model.training == True:
-                print("Training")
-            else:
-                print("Eval")
             if output == False:
                 continue
             total_loss = sum([attr_loss for attr_loss in output.values()])
@@ -237,14 +258,13 @@ def training_loop(torch_ds, validation_ds, optimizer, device, model, classifier_
             #    loss = loss + output[attr].item()
                 #print(f"Training: Attr: {attr} || Loss: {output[attr].item()}")
                 writer.add_scalar(f"{attr} Loss/train", output[attr].item(), step_counter)
-                print(attr)
-            print(f"Training: Overall Loss: {total_loss}")
+                #print(attr)
+            #print(f"Training: Overall Loss: {total_loss}")
             writer.add_scalar("Training Overall Loss", total_loss, step_counter)
             total_loss.backward()
             optimizer.step()
             step_counter += 1
         print(step_counter)
-        print("DONE")
         validation_loop(validation_ds, device, model, classifier_params, i)
         scheduler.step()
         model.train()
