@@ -34,46 +34,43 @@ class OverallModel(nn.Module):
 
     def loss_layers(self, training):
         if training:
-            age_weight = [20, 0.3373, 1.0606, 23.3333]
-            backpack_weight = [0.6714, 1.958]
-            bag_weight = [0.6779, 1.9047]
-            clothes_weight = [0.5773, 3.7333]
-            down_weight = [0.844, 1.223]
-            gender_weight = [0.844, 1.223]
-            hair_weight = [0.733, 1.573]
-            handbag_weight = [0.5668, 4.2424]
-            hat_weight = [0.5137, 18.6666]
-            up_weight = [0.525, 10.370]
-            down_colours_weight = [0.2705, 0.7329, 1.0916,
-                                   0.6222, 4.7863, 2.9630, 62.2222, 1.3827, 7.7778]
-            up_colours_weight =
-        else:
-            age_weight = [25, 0.2781, 2.7812, 22.25]
-            backpack_weight = [0.7542, 1.4833]
-            bag_weight = [0.5933, 3.1785]
-            clothes_weight = [0.5933, 3.1785]
-            down_weight = [0.7295, 1.5892]
-            gender_weight = [0.908, 1.113]
-            hair_weight = [0.795, 1.348]
-            handbag_weight = [0.5426, 6.3571]
-            hat_weight = [0.5361, 7.4166]
-            up_weight = [0.536, 7.417]
-            down_colours_weight = [0.291, 0.471, 1.236,
-                                   0.761, 9.889, 2.472, 0, 1.413, 9.889]
-            up_colours_weight =
+            age_weight = torch.Tensor([20, 0.3373, 1.0606, 23.3333])
+            backpack_weight = torch.Tensor([0.6714, 1.958])
+            bag_weight = torch.Tensor([0.6779, 1.9047])
+            clothes_weight = torch.Tensor([0.5773, 3.7333])
+            handbag_weight = torch.Tensor([0.5668, 4.2424])
+            hat_weight = torch.Tensor([0.5137, 18.6666])
+            up_weight = torch.Tensor([0.525, 10.370])
+            down_colours_weight = torch.Tensor([0.2705, 0.7329, 1.0916,
+                                   0.6222, 4.7863, 2.9630, 62.2222, 1.3827, 7.7778])
+            up_colours_weight = torch.Tensor([0.7447, 1.75, 1, 1.4894, 2.9167, 1.1667, 
+                                    0.3608, 0.3608])
 
+            loss_layers = nn.ModuleDict({'age': nn.CrossEntropyLoss(weight = age_weight),
+                                        'backpack': nn.BCELoss(weight = backpack_weight),
+                                        'bag': nn.BCELoss(weight = bag_weight),
+                                        'clothes': nn.BCELoss(weight = clothes_weight),
+                                        'down': nn.BCELoss(),
+                                        'down_colours': nn.CrossEntropyLoss(weight = down_colours_weight),
+                                        'gender': nn.BCELoss(),
+                                        'hair': nn.BCELoss(),
+                                        'handbag': nn.BCELoss(weight = handbag_weight),
+                                        'hat': nn.BCELoss(weight = hat_weight),
+                                        'up': nn.BCELoss(weight = up_weight),
+                                        'up_colours': nn.CrossEntropyLoss(weight = up_colours_weight)})
+        
         loss_layers = nn.ModuleDict({'age': nn.CrossEntropyLoss(),
-                                     'backpack': nn.BCELoss(),
-                                     'bag': nn.BCELoss(),
-                                     'clothes': nn.BCELoss(),
-                                     'down': nn.BCELoss(),
-                                     'down_colours': nn.CrossEntropyLoss(),
-                                     'gender': nn.BCELoss(),
-                                     'hair': nn.BCELoss(),
-                                     'handbag': nn.BCELoss(),
-                                     'hat': nn.BCELoss(),
-                                     'up': nn.BCELoss(),
-                                     'up_colours': nn.CrossEntropyLoss()})
+                                        'backpack': nn.BCELoss(),
+                                        'bag': nn.BCELoss(),
+                                        'clothes': nn.BCELoss(),
+                                        'down': nn.BCELoss(),
+                                        'down_colours': nn.CrossEntropyLoss(),
+                                        'gender': nn.BCELoss(),
+                                        'hair': nn.BCELoss(),
+                                        'handbag': nn.BCELoss(),
+                                        'hat': nn.BCELoss(),
+                                        'up': nn.BCELoss(),
+                                        'up_colours': nn.CrossEntropyLoss()})
         return loss_layers
 
     def forward(self, input, targets):
