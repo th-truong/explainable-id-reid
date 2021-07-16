@@ -34,30 +34,30 @@ class OverallModel(nn.Module):
 
     def loss_layers(self, training):
         if training:
-            age_weight = torch.Tensor([20, 0.3373, 1.0606, 23.3333])
-            backpack_weight = torch.Tensor([0.6714, 1.958])
+            age_weight = torch.Tensor([2, 0.3373, 1.0606, 2])
+            backpack_weight = torch.Tensor([0.5, 1])
             bag_weight = torch.Tensor([0.6779, 1.9047])
-            clothes_weight = torch.Tensor([0.5773, 3.7333])
-            handbag_weight = torch.Tensor([0.5668, 4.2424])
-            hat_weight = torch.Tensor([0.5137, 18.6666])
-            up_weight = torch.Tensor([0.525, 10.370])
+            clothes_weight = torch.Tensor([0.5773, 2])
+            handbag_weight = torch.Tensor([0.5668, 2])
+            hat_weight = torch.Tensor([0.5137, 2])
+            up_weight = torch.Tensor([0.525, 2])
             down_colours_weight = torch.Tensor([0.2705, 0.7329, 1.0916,
-                                   0.6222, 4.7863, 2.9630, 62.2222, 1.3827, 7.7778])
-            up_colours_weight = torch.Tensor([0.7447, 1.75, 1, 1.4894, 2.9167, 1.1667, 
+                                   0.6222, 4.7863, 2.9630, 2, 1.3827, 2])
+            up_colours_weight = torch.Tensor([0.7447, 1.75, 1, 1.4894, 2, 1.1667, 
                                     0.3608, 0.3608])
 
-            loss_layers = nn.ModuleDict({'age': nn.CrossEntropyLoss(weight = age_weight),
+            loss_layers = nn.ModuleDict({'age': nn.CrossEntropyLoss(),#weight = age_weight),
                                         'backpack': nn.BCELoss(weight = backpack_weight),
-                                        'bag': nn.BCELoss(weight = bag_weight),
-                                        'clothes': nn.BCELoss(weight = clothes_weight),
+                                        'bag': nn.BCELoss(),
+                                        'clothes': nn.BCELoss(),#weight = clothes_weight),
                                         'down': nn.BCELoss(),
-                                        'down_colours': nn.CrossEntropyLoss(weight = down_colours_weight),
+                                        'down_colours': nn.CrossEntropyLoss(),#weight = down_colours_weight),
                                         'gender': nn.BCELoss(),
                                         'hair': nn.BCELoss(),
-                                        'handbag': nn.BCELoss(weight = handbag_weight),
-                                        'hat': nn.BCELoss(weight = hat_weight),
-                                        'up': nn.BCELoss(weight = up_weight),
-                                        'up_colours': nn.CrossEntropyLoss(weight = up_colours_weight)})
+                                        'handbag': nn.BCELoss(),#weight = handbag_weight),
+                                        'hat': nn.BCELoss(),#weight = hat_weight),
+                                        'up': nn.BCELoss(),#weight = up_weight),
+                                        'up_colours': nn.CrossEntropyLoss()})#weight = up_colours_weight)})
         
         loss_layers = nn.ModuleDict({'age': nn.CrossEntropyLoss(),
                                         'backpack': nn.BCELoss(),
@@ -346,8 +346,8 @@ if __name__ == "__main__":
     for k, v in model.named_parameters():
         print('{}: {}'.format(k, v.requires_grad))
     model = model.train()
-    optimizer = optim.SGD(obj.parameters(
-    ), lr=architecture['optimizer']['kwargs']['lr'], momentum=architecture['optimizer']['kwargs']['momentum'])
+    optimizer = optim.Adam(obj.parameters(
+    ), lr=architecture['optimizer']['kwargs']['lr'])
     model = model.to(device)
     scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[
                                                      architecture['scheduler']['kwargs']['milestones']], gamma=architecture['scheduler']['kwargs']['gamma'])

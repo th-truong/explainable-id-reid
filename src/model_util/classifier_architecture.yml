@@ -141,7 +141,7 @@ attribute_classification_layers:
       bias: true
 
 attributes_to_use:
-  - hair
+  - backpack
 
 dataloader:
   kwargs:
@@ -152,7 +152,7 @@ backbone:
   kwargs:
     backbone_name: resnet50
     pretrained: true
-    trainable_layers: 0
+    trainable_layers: 5
 
 backbone_output_to_use: 3
 
@@ -160,8 +160,7 @@ epochs: 5
 
 optimizer:
   kwargs:
-    lr: 0.0001
-    momentum: 0.9
+    lr: 0.001
 
 scheduler:
   kwargs:
