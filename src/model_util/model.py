@@ -35,7 +35,7 @@ class OverallModel(nn.Module):
     def loss_layers(self, training):
         if training:
             age_weight = torch.Tensor([2, 0.3373, 1.0606, 2])
-            backpack_weight = torch.Tensor([0.5, 1])
+            backpack_weight = torch.Tensor([0.5, 2])
             bag_weight = torch.Tensor([0.6779, 1.9047])
             clothes_weight = torch.Tensor([0.5773, 2])
             handbag_weight = torch.Tensor([0.5668, 2])
@@ -174,7 +174,7 @@ class Classifier(nn.Module):
         super(Classifier, self).__init__()
         layers_to_add = classifier_params["hidden_layers"]
         self.device = device
-        self.layers = nn.ModuleList()
+        layers = []
         linear_counter = 0
         for layer in layers_to_add:
             if layer['type'] == 'linear':
@@ -187,39 +187,39 @@ class Classifier(nn.Module):
                         layer['kwargs']['in_features'] = 2048
                     elif backbone_output == "pool":
                         layer['kwargs']['in_features'] = 512
-                self.layers.append(nn.Linear(**layer['kwargs']))
+                layers.append(nn.Linear(**layer['kwargs']))
                 linear_counter += 1
             elif layer['type'] == 'relu_activation':
-                self.layers.append(nn.ReLU(**layer['kwargs']))
+                layers.append(nn.ReLU(**layer['kwargs']))
             elif layer['type'] == 'dropout':
-                self.layers.append(nn.Dropout(**layer['kwargs']))
-        self.classify_layers = self.attribute_classifier(classifier_params)
+                layers.append(nn.Dropout(**layer['kwargs']))
+        self.classify_layers = self.attribute_classifier(classifier_params, layers)
+        print(self.classify_layers)
 
-    def attribute_classifier(self, classifier_params):
+    def attribute_classifier(self, classifier_params, layers):
         layers_to_add = classifier_params["attribute_classification_layers"]
         layers_to_use = classifier_params["attributes_to_use"]
-        attribute_layers_dict = nn.ModuleDict()
+
+        attr_dict = {}
         for layer in layers_to_add:
-            activation = None
-            if layer['attribute'] in layers_to_use:
-                if layer['type'] == 'linear':
-                    linear = nn.Linear(**layer['kwargs'])
-                if layer['activation'] == 'softmax':
-                    activation = nn.Softmax(dim=None)
-                elif layer['activation'] == 'sigmoid':
-                    activation = nn.Sigmoid()
-                if activation == None:
-                    attribute_layers_dict[layer['attribute']] = linear
-                else:
-                    attribute_layers_dict[layer['attribute']
-                                          ] = nn.Sequential(linear, activation)
-        return attribute_layers_dict
+            if layer['attribute'] not in layers_to_use:
+                continue
+            classifiers = []
+            if layer['type'] == 'linear':
+                classifiers.append(nn.Linear(**layer['kwargs']))
+            if layer['activation'] == 'sigmoid':
+                classifiers.append(nn.Sigmoid())
+            attr_dict[layer['attribute']] = layers + classifiers
+
+        classify_layers = nn.ModuleDict()
+        for attr in list(attr_dict.keys()):
+            print(attr_dict[attr])
+            classify_layers[attr] = nn.Sequential(*attr_dict[attr])
+        return classify_layers
 
     def forward(self, backbone_output):
         x = backbone_output
         x = torch.flatten(x, start_dim=1).to(self.device)
-        for layer in self.layers:
-            x = layer(x).to(self.device)
 
         attribute_predictions = {}
         for attr_key in list(self.classify_layers.keys()):
@@ -341,8 +341,10 @@ if __name__ == "__main__":
         architecture['backbone_output_to_use']), device)
     model = OverallModel(backbone, obj, str(
         architecture['backbone_output_to_use']), device)
-    # for param in model.parameters():
-    #    param.requires_grad = True
+    # Freezing the FPN layers:
+    for k, v in model.named_parameters():
+        if "backbone.fpn" in str(k):
+            v.requires_grad = False
     for k, v in model.named_parameters():
         print('{}: {}'.format(k, v.requires_grad))
     model = model.train()

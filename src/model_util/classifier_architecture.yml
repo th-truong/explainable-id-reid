@@ -152,7 +152,7 @@ backbone:
   kwargs:
     backbone_name: resnet50
     pretrained: true
-    trainable_layers: 5
+    trainable_layers: 0
 
 backbone_output_to_use: 3
 
