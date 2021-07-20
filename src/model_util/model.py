@@ -173,58 +173,47 @@ class Classifier(nn.Module):
     def __init__(self, classifier_params, backbone_output, device):
         super(Classifier, self).__init__()
         layers_to_add = classifier_params["hidden_layers"]
-        self.device = device
-        layers = []
-        linear_counter = 0
-        for layer in layers_to_add:
-            if layer['type'] == 'linear':
-                if linear_counter == 0:
-                    if backbone_output == "1":
-                        layer['kwargs']['in_features'] = 32768
-                    elif backbone_output == "2":
-                        layer['kwargs']['in_features'] = 8192
-                    elif backbone_output == "3":
-                        layer['kwargs']['in_features'] = 2048
-                    elif backbone_output == "pool":
-                        layer['kwargs']['in_features'] = 512
-                layers.append(nn.Linear(**layer['kwargs']))
-                linear_counter += 1
-            elif layer['type'] == 'relu_activation':
-                layers.append(nn.ReLU(**layer['kwargs']))
-            elif layer['type'] == 'dropout':
-                layers.append(nn.Dropout(**layer['kwargs']))
-        self.classify_layers = self.attribute_classifier(classifier_params, layers)
-        print(self.classify_layers)
-
-    def attribute_classifier(self, classifier_params, layers):
-        layers_to_add = classifier_params["attribute_classification_layers"]
+        classifier_layers_to_add = classifier_params["attribute_classification_layers"]
         layers_to_use = classifier_params["attributes_to_use"]
+        self.device = device
+        linear_counter = 0
+        self.model_layers = nn.ModuleDict()
+        for attr in layers_to_use:
+            layers = []
+            for layer in layers_to_add:
+                if layer['type'] == 'linear':
+                    if linear_counter == 0:
+                        if backbone_output == "1":
+                            layer['kwargs']['in_features'] = 32768
+                        elif backbone_output == "2":
+                            layer['kwargs']['in_features'] = 8192
+                        elif backbone_output == "3":
+                            layer['kwargs']['in_features'] = 2048
+                        elif backbone_output == "pool":
+                            layer['kwargs']['in_features'] = 512
+                    layers.append(nn.Linear(**layer['kwargs']))
+                    linear_counter += 1
+                elif layer['type'] == 'relu_activation':
+                    layers.append(nn.ReLU(**layer['kwargs']))
+                elif layer['type'] == 'dropout':
+                    layers.append(nn.Dropout(**layer['kwargs']))
 
-        attr_dict = {}
-        for layer in layers_to_add:
-            if layer['attribute'] not in layers_to_use:
-                continue
-            classifiers = []
-            if layer['type'] == 'linear':
-                classifiers.append(nn.Linear(**layer['kwargs']))
-            if layer['activation'] == 'sigmoid':
-                classifiers.append(nn.Sigmoid())
-            attr_dict[layer['attribute']] = layers + classifiers
-
-        classify_layers = nn.ModuleDict()
-        for attr in list(attr_dict.keys()):
-            print(attr_dict[attr])
-            classify_layers[attr] = nn.Sequential(*attr_dict[attr])
-        return classify_layers
-
+            for layer in classifier_layers_to_add:
+                if layer['attribute'] == attr:
+                    if layer['type'] == 'linear':
+                        layers.append(nn.Linear(**layer['kwargs']))
+                    if layer['activation'] == 'sigmoid':
+                        layers.append(nn.Sigmoid())
+            self.model_layers[attr] = nn.Sequential(*layers)
+            
     def forward(self, backbone_output):
         x = backbone_output
-        x = torch.flatten(x, start_dim=1).to(self.device)
+        x = torch.flatten(x, start_dim=1)
 
         attribute_predictions = {}
-        for attr_key in list(self.classify_layers.keys()):
-            y = self.classify_layers[attr_key](x).to(self.device)
-            attribute_predictions[attr_key] = y.to(self.device)
+        for attr_key in list(self.model_layers.keys()):
+            y = self.model_layers[attr_key](x)
+            attribute_predictions[attr_key] = y
 
         return attribute_predictions
 
@@ -347,7 +336,8 @@ if __name__ == "__main__":
             v.requires_grad = False
     for k, v in model.named_parameters():
         print('{}: {}'.format(k, v.requires_grad))
-    print(list(model.modules()))
+    #print(list(model.modules()))
+
     model = model.train()
     optimizer = optim.Adam(obj.parameters(
     ), lr=architecture['optimizer']['kwargs']['lr'])
