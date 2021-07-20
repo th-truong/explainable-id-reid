@@ -46,18 +46,18 @@ class OverallModel(nn.Module):
             up_colours_weight = torch.Tensor([0.7447, 1.75, 1, 1.4894, 2, 1.1667, 
                                     0.3608, 0.3608])
 
-            loss_layers = nn.ModuleDict({'age': nn.CrossEntropyLoss(),#weight = age_weight),
+            loss_layers = nn.ModuleDict({'age': nn.CrossEntropyLoss(weight = age_weight),
                                         'backpack': nn.BCELoss(weight = backpack_weight),
                                         'bag': nn.BCELoss(),
-                                        'clothes': nn.BCELoss(),#weight = clothes_weight),
+                                        'clothes': nn.BCELoss(weight = clothes_weight),
                                         'down': nn.BCELoss(),
-                                        'down_colours': nn.CrossEntropyLoss(),#weight = down_colours_weight),
+                                        'down_colours': nn.CrossEntropyLoss(weight = down_colours_weight),
                                         'gender': nn.BCELoss(),
                                         'hair': nn.BCELoss(),
-                                        'handbag': nn.BCELoss(),#weight = handbag_weight),
-                                        'hat': nn.BCELoss(),#weight = hat_weight),
-                                        'up': nn.BCELoss(),#weight = up_weight),
-                                        'up_colours': nn.CrossEntropyLoss()})#weight = up_colours_weight)})
+                                        'handbag': nn.BCELoss(weight = handbag_weight),
+                                        'hat': nn.BCELoss(weight = hat_weight),
+                                        'up': nn.BCELoss(weight = up_weight),
+                                        'up_colours': nn.CrossEntropyLoss(weight = up_colours_weight)})
         
         loss_layers = nn.ModuleDict({'age': nn.CrossEntropyLoss(),
                                         'backpack': nn.BCELoss(),
@@ -115,7 +115,7 @@ class OverallModel(nn.Module):
 
 
 def metric_calculator(pred_and_true, classifier_params, epoch, device):
-    print(pred_and_true)
+    #print(pred_and_true)
     metrics = {}
     predictions = {}
     real = {}
@@ -163,7 +163,7 @@ def metric_calculator(pred_and_true, classifier_params, epoch, device):
             precision, recall, _, _ = precision_recall_fscore_support(torch.flatten(real[attr].cpu(
             )), torch.round(torch.flatten(predictions[attr].cpu()).type(torch.float)), average='macro')
             metrics[attr] = {'precision': precision, 'recall': recall}
-    print(metrics)
+    #print(metrics)
     return metrics
 
 
@@ -286,7 +286,7 @@ def training_loop(torch_ds, validation_ds, optimizer, device, model, classifier_
             total_loss.backward()
             optimizer.step()
             step_counter += 1
-        print(step_counter)
+        #print(step_counter)
         validation_loop(validation_ds, device, model, classifier_params, i)
         scheduler.step()
         model.train()
@@ -347,6 +347,7 @@ if __name__ == "__main__":
             v.requires_grad = False
     for k, v in model.named_parameters():
         print('{}: {}'.format(k, v.requires_grad))
+    print(list(model.modules()))
     model = model.train()
     optimizer = optim.Adam(obj.parameters(
     ), lr=architecture['optimizer']['kwargs']['lr'])
