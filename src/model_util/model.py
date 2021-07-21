@@ -42,22 +42,22 @@ class OverallModel(nn.Module):
             hat_weight = torch.Tensor([0.5137, 2])
             up_weight = torch.Tensor([0.525, 2])
             down_colours_weight = torch.Tensor([0.2705, 0.7329, 1.0916,
-                                   0.6222, 4.7863, 2.9630, 2, 1.3827, 2])
+                                   0.6222, 2, 2, 2, 1.3827, 2])
             up_colours_weight = torch.Tensor([0.7447, 1.75, 1, 1.4894, 2, 1.1667, 
                                     0.3608, 0.3608])
 
-            loss_layers = nn.ModuleDict({'age': nn.CrossEntropyLoss(),#weight = age_weight),
+            loss_layers = nn.ModuleDict({'age': nn.CrossEntropyLoss(weight = age_weight),
                                         'backpack': nn.BCELoss(),#weight = backpack_weight),
                                         'bag': nn.BCELoss(),
-                                        'clothes': nn.BCELoss(),#weight = clothes_weight),
+                                        'clothes': nn.BCELoss(weight = clothes_weight),
                                         'down': nn.BCELoss(),
-                                        'down_colours': nn.CrossEntropyLoss(),#weight = down_colours_weight),
+                                        'down_colours': nn.CrossEntropyLoss(weight = down_colours_weight),
                                         'gender': nn.BCELoss(),
                                         'hair': nn.BCELoss(),
-                                        'handbag': nn.BCELoss(),#weight = handbag_weight),
-                                        'hat': nn.BCELoss(),#weight = hat_weight),
-                                        'up': nn.BCELoss(),#weight = up_weight),
-                                        'up_colours': nn.CrossEntropyLoss()})#weight = up_colours_weight)})
+                                        'handbag': nn.BCELoss(weight = handbag_weight),
+                                        'hat': nn.BCELoss(weight = hat_weight),
+                                        'up': nn.BCELoss(weight = up_weight),
+                                        'up_colours': nn.CrossEntropyLoss(weight = up_colours_weight)})
         
         loss_layers = nn.ModuleDict({'age': nn.CrossEntropyLoss(),
                                         'backpack': nn.BCELoss(),
@@ -172,39 +172,69 @@ class Classifier(nn.Module):
     # is False (not included), but can do so
     def __init__(self, classifier_params, backbone_output, device):
         super(Classifier, self).__init__()
-        layers_to_add = classifier_params["hidden_layers"]
+        binary_layers_to_add = classifier_params["hidden_layers_binary"]
+        multi_layers_to_add = classifier_params['hidden_layers_multi']
         classifier_layers_to_add = classifier_params["attribute_classification_layers"]
         layers_to_use = classifier_params["attributes_to_use"]
         self.device = device
-        linear_counter = 0
         self.model_layers = nn.ModuleDict()
         for attr in layers_to_use:
+            binary_linear_counter = 0
+            multi_linear_counter = 0
             layers = []
-            for layer in layers_to_add:
-                if layer['type'] == 'linear':
-                    if linear_counter == 0:
-                        if backbone_output == "1":
-                            layer['kwargs']['in_features'] = 32768
-                        elif backbone_output == "2":
-                            layer['kwargs']['in_features'] = 8192
-                        elif backbone_output == "3":
-                            layer['kwargs']['in_features'] = 2048
-                        elif backbone_output == "pool":
-                            layer['kwargs']['in_features'] = 512
-                    layers.append(nn.Linear(**layer['kwargs']))
-                    linear_counter += 1
-                elif layer['type'] == 'relu_activation':
-                    layers.append(nn.ReLU(**layer['kwargs']))
-                elif layer['type'] == 'dropout':
-                    layers.append(nn.Dropout(**layer['kwargs']))
-
-            for layer in classifier_layers_to_add:
-                if layer['attribute'] == attr:
+            if attr != 'age' and attr != 'down_colours' and attr != 'up_colours':
+                for layer in binary_layers_to_add:
                     if layer['type'] == 'linear':
+                        if binary_linear_counter == 0:
+                            if backbone_output == "1":
+                                layer['kwargs']['in_features'] = 32768
+                            elif backbone_output == "2":
+                                layer['kwargs']['in_features'] = 8192
+                            elif backbone_output == "3":
+                                layer['kwargs']['in_features'] = 2048
+                            elif backbone_output == "pool":
+                                layer['kwargs']['in_features'] = 512
                         layers.append(nn.Linear(**layer['kwargs']))
-                    if layer['activation'] == 'sigmoid':
-                        layers.append(nn.Sigmoid())
-            self.model_layers[attr] = nn.Sequential(*layers)
+                        binary_linear_counter += 1
+                    elif layer['type'] == 'relu_activation':
+                        layers.append(nn.ReLU(**layer['kwargs']))
+                    elif layer['type'] == 'dropout':
+                        layers.append(nn.Dropout(**layer['kwargs']))
+
+                for layer in classifier_layers_to_add:
+                    if layer['attribute'] == attr:
+                        if layer['type'] == 'linear':
+                            layers.append(nn.Linear(**layer['kwargs']))
+                        if layer['activation'] == 'sigmoid':
+                            layers.append(nn.Sigmoid())
+                self.model_layers[attr] = nn.Sequential(*layers)
+            else:
+                for layer in multi_layers_to_add:
+                    if layer['type'] == 'linear':
+                        if multi_linear_counter == 0:
+                            if backbone_output == "1":
+                                layer['kwargs']['in_features'] = 32768
+                            elif backbone_output == "2":
+                                layer['kwargs']['in_features'] = 8192
+                            elif backbone_output == "3":
+                                layer['kwargs']['in_features'] = 2048
+                            elif backbone_output == "pool":
+                                layer['kwargs']['in_features'] = 512
+                        layers.append(nn.Linear(**layer['kwargs']))
+                        multi_linear_counter += 1
+                    elif layer['type'] == 'relu_activation':
+                        layers.append(nn.ReLU(**layer['kwargs']))
+                    elif layer['type'] == 'dropout':
+                        layers.append(nn.Dropout(**layer['kwargs']))
+
+                for layer in classifier_layers_to_add:
+                    if layer['attribute'] == attr:
+                        if layer['type'] == 'linear':
+                            layers.append(nn.Linear(**layer['kwargs']))
+                        if layer['activation'] == 'sigmoid':
+                            layers.append(nn.Sigmoid())
+                self.model_layers[attr] = nn.Sequential(*layers)
+        print(self.model_layers)
             
     def forward(self, backbone_output):
         x = backbone_output

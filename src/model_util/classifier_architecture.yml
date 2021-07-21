@@ -1,11 +1,6 @@
-hidden_layers:
+hidden_layers_binary:
   - type: linear
     kwargs:
-      # in_features to use based on Resnet50-FPN backbone output being passed:
-      # For '1', 32768
-      # For '2', 8192
-      # For '3', 2048
-      # For 'pool', 512
       in_features: 512
       out_features: 128
       bias: true
@@ -43,12 +38,52 @@ hidden_layers:
       p: 0.5
       inplace: true
 
+hidden_layers_multi:
+  - type: linear
+    kwargs:
+      in_features: 512
+      out_features: 256
+      bias: true
+  - type: relu_activation
+    kwargs:
+      inplace: false
+  - type: dropout
+    kwargs:
+      p: 0.5
+      inplace: true
+
+  - type: linear
+    kwargs:
+      in_features: 256
+      out_features: 128
+      bias: true
+  - type: relu_activation
+    kwargs:
+      inplace: false
+  - type: dropout
+    kwargs:
+      p: 0.5
+      inplace: true
+
+  - type: linear
+    kwargs:
+      in_features: 128
+      out_features: 256
+      bias: true
+  - type: relu_activation
+    kwargs:
+      inplace: false
+  - type: dropout
+    kwargs:
+      p: 0.5
+      inplace: true
+
 attribute_classification_layers:
   - type: linear
     attribute: age
     activation: none
     kwargs:
-      in_features: 128
+      in_features: 256
       out_features: 4
       bias: true
 
@@ -88,7 +123,7 @@ attribute_classification_layers:
     attribute: down_colours
     activation: none
     kwargs:
-      in_features: 128
+      in_features: 256
       out_features: 9
       bias: true
 
@@ -136,22 +171,13 @@ attribute_classification_layers:
     attribute: up_colours
     activation: none
     kwargs:
-      in_features: 128
+      in_features: 256
       out_features: 8
       bias: true
 
 attributes_to_use:
   - age
-  - backpack
-  - bag
-  - clothes
-  - down
   - down_colours
-  - gender
-  - hair
-  - handbag
-  - hat
-  - up
   - up_colours
 
 dataloader:
@@ -167,13 +193,13 @@ backbone:
 
 backbone_output_to_use: 3
 
-epochs: 5
+epochs: 10
 
 optimizer:
   kwargs:
-    lr: 0.001
+    lr: 0.005
 
 scheduler:
   kwargs:
-    milestones: 3
-    gamma: 0.1
+    milestones: 5
+    gamma: 0.2
