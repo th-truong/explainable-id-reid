@@ -46,18 +46,18 @@ class OverallModel(nn.Module):
             up_colours_weight = torch.Tensor([0.7447, 1.75, 1, 1.4894, 2, 1.1667, 
                                     0.3608, 0.3608])
 
-            loss_layers = nn.ModuleDict({'age': nn.CrossEntropyLoss(weight = age_weight),
-                                        'backpack': nn.BCELoss(weight = backpack_weight),
+            loss_layers = nn.ModuleDict({'age': nn.CrossEntropyLoss(),#weight = age_weight),
+                                        'backpack': nn.BCELoss(),#weight = backpack_weight),
                                         'bag': nn.BCELoss(),
-                                        'clothes': nn.BCELoss(weight = clothes_weight),
+                                        'clothes': nn.BCELoss(),#weight = clothes_weight),
                                         'down': nn.BCELoss(),
-                                        'down_colours': nn.CrossEntropyLoss(weight = down_colours_weight),
+                                        'down_colours': nn.CrossEntropyLoss(),#weight = down_colours_weight),
                                         'gender': nn.BCELoss(),
                                         'hair': nn.BCELoss(),
-                                        'handbag': nn.BCELoss(weight = handbag_weight),
-                                        'hat': nn.BCELoss(weight = hat_weight),
-                                        'up': nn.BCELoss(weight = up_weight),
-                                        'up_colours': nn.CrossEntropyLoss(weight = up_colours_weight)})
+                                        'handbag': nn.BCELoss(),#weight = handbag_weight),
+                                        'hat': nn.BCELoss(),#weight = hat_weight),
+                                        'up': nn.BCELoss(),#weight = up_weight),
+                                        'up_colours': nn.CrossEntropyLoss()})#weight = up_colours_weight)})
         
         loss_layers = nn.ModuleDict({'age': nn.CrossEntropyLoss(),
                                         'backpack': nn.BCELoss(),
