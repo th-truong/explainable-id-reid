@@ -14,6 +14,8 @@ import matplotlib.pyplot as plt
 from torch.utils.tensorboard import SummaryWriter
 from sklearn.metrics import precision_recall_fscore_support
 from sklearn.metrics import confusion_matrix
+from sklearn.metrics import accuracy_score
+from sklearn.metrics import classification_report
 
 import warnings
 warnings.simplefilter(action='ignore', category=FutureWarning)
@@ -22,11 +24,12 @@ torch.autograd.set_detect_anomaly(True)
 
 
 class OverallModel(nn.Module):
-    def __init__(self, backbone, classifier, output_to_use):
+    def __init__(self, backbone, classifier, output_to_use, device):
         super(OverallModel, self).__init__()
         self.backbone = backbone
         self.classifier = classifier
         self.output_to_use = output_to_use
+        self.device = device
         self.loss_layers = nn.ModuleDict({'age': nn.CrossEntropyLoss(),
                                           'backpack': nn.BCELoss(),
                                           'bag': nn.BCELoss(),
@@ -42,17 +45,11 @@ class OverallModel(nn.Module):
 
     def forward(self, input, targets):
         back_out = self.backbone(input)
-        output = self.classifier(back_out[self.output_to_use])
+        backbone_out = back_out[self.output_to_use].to(self.device)
+        output = self.classifier(backbone_out)
         target_outputs = {}
         if len(targets) >= 2:
             for attr in targets[0].keys():
-                status = True
-                for idx in range(len(targets)):
-                    if attr not in targets[idx].keys():
-                        status = False
-                        break
-                if status == False:
-                    continue
                 target_list = []
                 for index in range(len(targets)):
                     target_list.append(targets[index][attr])
@@ -83,7 +80,8 @@ class OverallModel(nn.Module):
         return output, output_dict
 
 
-def metric_calculator(y_pred, y_true, classifier_params):
+def metric_calculator(pred_and_true, classifier_params, epoch, device):
+    print(pred_and_true)
     metrics = {}
     predictions = {}
     real = {}
@@ -93,83 +91,55 @@ def metric_calculator(y_pred, y_true, classifier_params):
         real[attr] = []
         metrics[attr] = 0
 
-    for t in y_pred:
+    for t in pred_and_true:
         for attr in classifier_params:
             if attr == 'age' or attr == 'up_colours' or attr == 'down_colours':
-                to_add = torch.argmax(t[attr], dim=1)
+                to_add = torch.argmax(t[0][attr], dim=1)
                 predictions[attr].append(to_add)
+                real[attr].append(t[1][attr])
             else:
-                predictions[attr].append(t[attr])
+                predictions[attr].append(t[0][attr])
+                real[attr].append(t[1][attr])
 
     for attr in predictions:
-        predictions[attr] = torch.stack(tuple(predictions[attr]))
-
-    for t in y_true:
-        for attr in classifier_params:
-            real[attr].append(t[attr])
+        predictions[attr] = torch.stack(tuple(predictions[attr])).to(device)
 
     for attr in real:
-        real[attr] = torch.stack(tuple(real[attr]))
-
-    this = torch.flatten(real['age'])
-    that = torch.flatten(predictions['age'])
-    print(torch.flatten(real[attr]).shape)
-    print(torch.round(torch.flatten(
-        predictions[attr]).type(torch.float)).shape)
+        real[attr] = torch.stack(tuple(real[attr])).to(device)
 
     for attr in metrics:
         if attr != 'age' and attr != 'down_colours' and attr != 'up_colours':
-            precision, recall, fscore, _ = precision_recall_fscore_support(torch.flatten(
-                real[attr]), torch.round(torch.flatten(predictions[attr]).type(torch.float)), average='weighted')
-            metrics[attr] = {'precision': precision, 'recall': recall}
+            conf = confusion_matrix(torch.flatten(real[attr].cpu()), torch.round(
+                torch.flatten(predictions[attr].cpu()).type(torch.float)))
+            tn, fp, fn, tp = conf.ravel()
+            precision, recall, _, _ = precision_recall_fscore_support(torch.flatten(real[attr].cpu(
+            )), torch.round(torch.flatten(predictions[attr].cpu()).type(torch.float)), average='macro')
+            accuracy = accuracy_score(torch.flatten(real[attr].cpu()), torch.round(
+                torch.flatten(predictions[attr].cpu()).type(torch.float)))
+            metrics[attr] = {'precision': precision, 'recall': recall, 'accuracy': accuracy,
+                             'sensitivity': tp/(tp + fn), 'specificity': tn/(tn + fp)}
         else:
-            conf = confusion_matrix(torch.flatten(real[attr]), torch.round(
-                torch.flatten(predictions[attr]).type(torch.float)))
-            print(type(conf))
-            plt.imshow(conf, cmap='binary', interpolation='None')
-            plt.show()
-
+            conf = confusion_matrix(torch.flatten(real[attr].cpu()), torch.round(
+                torch.flatten(predictions[attr].cpu()).type(torch.float)))
+            print(f"\nEPOCH: {epoch}")
+            print(conf)
+            print(classification_report(torch.flatten(real[attr].cpu()), torch.round(
+                torch.flatten(predictions[attr].cpu()).type(torch.float)), digits=3))
+            print("\n")
+            precision, recall, _, _ = precision_recall_fscore_support(torch.flatten(real[attr].cpu(
+            )), torch.round(torch.flatten(predictions[attr].cpu()).type(torch.float)), average='macro')
+            metrics[attr] = {'precision': precision, 'recall': recall}
     print(metrics)
-    # for t in y_true:
-    #    print(t)
-
-    # print(predictions['age'])
-    # print(real['age'])
-    # print(predictions['gender'])
-    # print(real['gender'])
-
-    # y_pred_copy = {}
-    # for attr in y_pred:
-    #     y_pred_copy[attr] = y_pred[attr]
-    # print(id(y_pred) == id(y_pred_copy))
-    # for attr in y_pred:
-    #     if attr != 'age' and attr != 'up_colours' and attr != 'down_colours':
-    #         y_pred_copy[attr] = torch.round(y_pred[attr])
-    # for attr in y_pred_copy:
-    #     if attr == 'age' or attr == 'up_colours' or attr == 'down_colours':
-    #         precision, recall, fscore, _ = precision_recall_fscore_support(torch.flatten(torch.stack(tuple(t[attr] for t in y_true))).tolist(), torch.argmax(y_pred_copy[attr], dim = 1).tolist(), average = 'micro')
-    #         accuracy = accuracy_score(torch.flatten(torch.stack(tuple(t[attr] for t in y_true))).tolist(), torch.argmax(y_pred_copy[attr], dim = 1).tolist())
-    #         metrics[attr] = {'recall': recall,
-    #                         'precision': precision,
-    #                         'fscore': fscore,
-    #                         'accuracy': accuracy}
-    #     else:
-    #         precision, recall, fscore, _ = precision_recall_fscore_support(torch.flatten(torch.stack(tuple(t[attr] for t in y_true))).tolist(), torch.flatten(y_pred_copy[attr]).tolist(), average = 'micro')
-    #         accuracy = accuracy_score(torch.flatten(torch.stack(tuple(t[attr] for t in y_true))).tolist(), torch.flatten(y_pred_copy[attr]).tolist())
-    #         metrics[attr] = {'recall': recall,
-    #                         'precision': precision,
-    #                         'fscore': fscore,
-    #                         'accuracy': accuracy}
-
-    # return metrics
+    return metrics
 
 
 class Classifier(nn.Module):
     # configurable, default activation layer is ReLU, but can be changed. Default setting for dropout
     # is False (not included), but can do so
-    def __init__(self, classifier_params, backbone_output):
-        super().__init__()
+    def __init__(self, classifier_params, backbone_output, device):
+        super(Classifier, self).__init__()
         layers_to_add = classifier_params["hidden_layers"]
+        self.device = device
         self.layers = nn.ModuleList()
         linear_counter = 0
         for layer in layers_to_add:
@@ -189,14 +159,14 @@ class Classifier(nn.Module):
                 self.layers.append(nn.ReLU(**layer['kwargs']))
             elif layer['type'] == 'dropout':
                 self.layers.append(nn.Dropout(**layer['kwargs']))
-        self.attribute_classifier(classifier_params)
+        self.classify_layers = self.attribute_classifier(classifier_params)
 
     def attribute_classifier(self, classifier_params):
         layers_to_add = classifier_params["attribute_classification_layers"]
         layers_to_use = classifier_params["attributes_to_use"]
-        self.attribute_layers_dict = {}
-        activation = None
+        attribute_layers_dict = nn.ModuleDict()
         for layer in layers_to_add:
+            activation = None
             if layer['attribute'] in layers_to_use:
                 if layer['type'] == 'linear':
                     linear = nn.Linear(**layer['kwargs'])
@@ -205,22 +175,23 @@ class Classifier(nn.Module):
                 elif layer['activation'] == 'sigmoid':
                     activation = nn.Sigmoid()
                 if activation == None:
-                    self.attribute_layers_dict[layer['attribute']] = nn.Sequential(
-                        linear)
+                    attribute_layers_dict[layer['attribute']] = linear
                 else:
-                    self.attribute_layers_dict[layer['attribute']] = nn.Sequential(
-                        linear, activation)
+                    attribute_layers_dict[layer['attribute']
+                                          ] = nn.Sequential(linear, activation)
+        return attribute_layers_dict
 
     def forward(self, backbone_output):
         x = backbone_output
-        x = torch.flatten(x, start_dim=1)
+        x = torch.flatten(x, start_dim=1).to(self.device)
         for layer in self.layers:
-            x = layer(x)
+            x = layer(x).to(self.device)
 
         attribute_predictions = {}
-        for attr_key in list(self.attribute_layers_dict.keys()):
-            attribute_predictions[attr_key] = self.attribute_layers_dict[attr_key](
-                x)
+        for attr_key in list(self.classify_layers.keys()):
+            y = self.classify_layers[attr_key](x).to(self.device)
+            attribute_predictions[attr_key] = y.to(self.device)
+
         return attribute_predictions
 
 
@@ -228,10 +199,9 @@ def collate_fn(batch):
     return tuple(zip(*batch))
 
 
-def validation_loop(validation_ds, device, model, classifier_params):
-    predictions = []
-    target_list_input = []
-    step_counter = 0
+def validation_loop(validation_ds, device, model, classifier_params, epoch):
+    predictions_and_real = []
+    model.eval()
     with torch.no_grad():
         for data in tqdm(iter(validation_ds)):
             inputs, labels = data
@@ -242,56 +212,60 @@ def validation_loop(validation_ds, device, model, classifier_params):
                 target_list = []
                 for index in range(len(targets)):
                     target_list.append(targets[index][attr])
-                target_attrs[attr] = torch.stack(tuple(target_list))
+                target_attrs[attr] = torch.stack(tuple(target_list)).to(device)
             images = torch.stack(images)
-            output, losses = model(images, targets)
-            predictions.append(output)
-            target_list_input.append(target_attrs)
-            if losses == False:
-                continue
-            loss = torch.Tensor([0])
-            for attr in losses:
-                loss = loss + losses[attr].item()
-                print(
-                    f"Validation: Attr: {attr} || Loss: {losses[attr].item()}")
-                writer.add_scalar(f"{attr} Loss/Validation",
-                                  losses[attr].item(), step_counter)
-            print(f"Validation Overall Loss: {loss}")
-            writer.add_scalar("Validation Overall Loss", loss, step_counter)
-            step_counter += 1
-        metric_calculator(predictions, target_list_input, classifier_params)
+            images = images.to(device)
+            output, _ = model(images, targets)
+            if model.training == True:
+                print("Training")
+            else:
+                print("Eval")
+            predictions_and_real.append((output, target_attrs))
+        from model_util.model2 import metric_calculator
+        metrics = metric_calculator(
+            predictions_and_real, classifier_params, epoch, device)
+        for attr in metrics:
+            for metric in metrics[attr]:
+                writer.add_scalar(f"{attr} {metric}",
+                                  metrics[attr][metric], epoch)
 
 
 def training_loop(torch_ds, validation_ds, optimizer, device, model, classifier_params, epochs=20):
     step_counter = 0
     for i in range(epochs):
         for data in tqdm(iter(torch_ds)):
-            break
             # get the inputs; data is a list of [inputs, labels]
             inputs, labels = data
             optimizer.zero_grad()
             images = list(image.to(device) for image in inputs)
             targets = [{k: v.to(device) for k, v in t.items()} for t in labels]
             images = torch.stack(images)
+            images = images.to(device)
+            print(torch.cuda.is_available())
             _, output = model(images, targets)
+            if model.training == True:
+                print("Training")
+            else:
+                print("Eval")
             if output == False:
                 continue
-            print("\n\n")
-            loss = torch.Tensor([0])
-            loss.requires_grad = True
+            total_loss = sum([attr_loss for attr_loss in output.values()])
             for attr in output:
-                loss = loss + output[attr].item()
-                print(f"Training: Attr: {attr} || Loss: {output[attr].item()}")
+                #    loss = loss + output[attr].item()
+                #print(f"Training: Attr: {attr} || Loss: {output[attr].item()}")
                 writer.add_scalar(f"{attr} Loss/train",
                                   output[attr].item(), step_counter)
-            print(f"Training: Overall Loss: {loss}")
-            writer.add_scalar("Training Overall Loss", loss, step_counter)
-            loss.backward()
+                print(attr)
+            print(f"Training: Overall Loss: {total_loss}")
+            writer.add_scalar("Training Overall Loss",
+                              total_loss, step_counter)
+            total_loss.backward()
             optimizer.step()
             step_counter += 1
+        print(step_counter)
         print("DONE")
-        validation_loop(validation_ds, device, model, classifier_params)
-        break
+        validation_loop(validation_ds, device, model, classifier_params, i)
+        model.train()
         torch.save({'model': model.state_dict(),
                     'optimizer': optimizer.state_dict()
                     }, str(i).zfill(3) + "resnet50_fpn_frcnn_full.tar")
@@ -301,30 +275,39 @@ def training_loop(torch_ds, validation_ds, optimizer, device, model, classifier_
 
 if __name__ == "__main__":
     writer = SummaryWriter()
+    device = torch.device(
+        'cuda') if torch.cuda.is_available() else torch.device('cpu')
+
     config = confuse.Configuration('market1501', __name__)
     config.set_file(Path(
         r"C:\\Users\\netra\\GithubEncm369\\reid\\explainable-id-reid\\src\\dataset_util\\market1501.yml"))
     cfg = confuse.Configuration('model_architecture', __name__, read=False)
     cfg.set_file(
         "C:\\Users\\netra\\GithubEncm369\\reid\\explainable-id-reid\\src\\model_util\\classifier_architecture.yml")
-    classifier_params = cfg.get()
+    architecture = cfg.get()
 
     from dataset_util.processor import MarketDataset
     test_obj = MarketDataset(
-        config['market_1501_ds']['test_path'].get(), True, 2, False, classifier_params['attributes_to_use'])
+        config['market_1501_ds']['test_path'].get(), True, 2, False, architecture['attributes_to_use'])
     train_obj = MarketDataset(
-        config['market_1501_ds']['train_path'].get(), True, 0, False, classifier_params['attributes_to_use'])
+        config['market_1501_ds']['train_path'].get(), True, 0, False, architecture['attributes_to_use'])
     validate_obj = MarketDataset(
-        config['market_1501_ds']['train_path'].get(), True, 1, False, classifier_params['attributes_to_use'])
+        config['market_1501_ds']['train_path'].get(), True, 1, False, architecture['attributes_to_use'])
+
+    print(len(train_obj.identities))
+    print(len(validate_obj.identities))
 
     torch_ds_test = torch.utils.data.DataLoader(test_obj,
-                                                batch_size=2, num_workers=8,
+                                                batch_size=architecture['dataloader']['kwargs']['batch_size'],
+                                                num_workers=architecture['dataloader']['kwargs']['num_workers'],
                                                 collate_fn=collate_fn)
     torch_ds_train = torch.utils.data.DataLoader(train_obj,
-                                                 batch_size=2, num_workers=8,
+                                                 batch_size=architecture['dataloader']['kwargs']['batch_size'],
+                                                 num_workers=architecture['dataloader']['kwargs']['num_workers'],
                                                  collate_fn=collate_fn)
     torch_ds_val = torch.utils.data.DataLoader(validate_obj,
-                                               batch_size=2, num_workers=8,
+                                               batch_size=architecture['dataloader']['kwargs']['batch_size'],
+                                               num_workers=architecture['dataloader']['kwargs']['num_workers'],
                                                collate_fn=collate_fn)
 
     #test_data = iter(torch_ds_test)
@@ -336,22 +319,26 @@ if __name__ == "__main__":
 
     # Parameters for loop:
     backbone = resnet_fpn_backbone(
-        'resnet50', pretrained=True, trainable_layers=0)
+        **architecture['backbone']['kwargs'])
+    backbone = backbone.to(device)
     # The second argument is the output being used as a String,
     # "1", "2", "3", or "pool"
     from model_util.model2 import Classifier
     from model_util.model2 import OverallModel
-    obj = Classifier(classifier_params, "2")
-    model = OverallModel(backbone, obj, "2")
+    obj = Classifier(architecture, str(
+        architecture['backbone_output_to_use']), device)
+    model = OverallModel(backbone, obj, str(
+        architecture['backbone_output_to_use']), device)
     # for param in model.parameters():
     #    param.requires_grad = True
     for k, v in model.named_parameters():
         print('{}: {}'.format(k, v.requires_grad))
     model = model.train()
-    optimizer = optim.SGD(obj.parameters(), lr=0.001, momentum=0.9)
-    epochs = 20
-    device = torch.device(
-        'cuda') if torch.cuda.is_available() else torch.device('cpu')
+    optimizer = optim.SGD(obj.parameters(
+    ), lr=architecture['optimizer']['kwargs']['lr'], momentum=architecture['optimizer']['kwargs']['momentum'])
+    model = model.to(device)
+    print(next(model.parameters()).device)
+    print("CUDA Availability: ", torch.cuda.is_available())
     training_loop(torch_ds_train, torch_ds_val, optimizer, device,
-                  model, classifier_params['attributes_to_use'], epochs)
+                  model, architecture['attributes_to_use'], architecture['epochs'])
     print('Finished Training')

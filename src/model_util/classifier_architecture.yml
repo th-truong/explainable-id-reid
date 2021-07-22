@@ -153,3 +153,23 @@ attributes_to_use:
   - hat
   - up
   - up_colours
+
+dataloader:
+  kwargs:
+    batch_size: 2
+    num_workers: 4
+
+backbone:
+  kwargs:
+    backbone_name: resnet50
+    pretrained: true
+    trainable_layers: 5
+
+backbone_output_to_use: 3
+
+epochs: 20
+
+optimizer:
+  kwargs:
+    lr: 0.001
+    momentum: 0.9

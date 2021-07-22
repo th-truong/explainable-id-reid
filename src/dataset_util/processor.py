@@ -71,6 +71,10 @@ class MarketDataset(object):
             if row[1]['downblack'] == 0 and row[1]['downwhite'] == 0 and row[1]['downpink'] == 0 and row[1]['downpurple'] == 0 and row[1]['downyellow'] == 0 and row[1]['downgray'] == 0 and row[1]['downblue'] == 0 and row[1]['downgreen'] == 0 and row[1]['downbrown'] == 0:
                 if row[1]['image_index'][0] not in indexes_to_skip:
                     indexes_to_skip.append(row[1]['image_index'][0])
+        self.identities = []
+        for idx in indexes_to_skip:
+            row = self.attribute_market.loc[self.attribute_market["image_index"] == idx].index
+            self.attribute_market.drop(row, inplace=True)
         for file in os.listdir(path):
             if type == 0:
                 if file[-4:] == ".jpg":
@@ -81,9 +85,13 @@ class MarketDataset(object):
                     if self.mode == 0:
                         if int(file[0:4]) > 199:
                             file_paths.append(os.path.join(path, file))
+                            if int(file[0:4]) not in self.identities:
+                                self.identities.append(int(file[0:4]))
                     elif self.mode == 1:
                         if int(file[0:4]) <= 199:
                             file_paths.append(os.path.join(path, file))
+                            if int(file[0:4]) not in self.identities:
+                                self.identities.append(int(file[0:4]))
                     elif self.mode == 2:
                         if file[0:2] != "-1" and file[0:4] != "0000":
                             file_paths.append(os.path.join(path, file))
