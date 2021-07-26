@@ -1,7 +1,5 @@
 from torchvision.models.detection.backbone_utils import resnet_fpn_backbone
 import torchvision
-import sys
-import os
 import confuse
 from pathlib import Path
 import torch
@@ -10,19 +8,16 @@ import torch.nn as nn
 import torch.optim as optim
 from tqdm import tqdm
 import torch
-import matplotlib.pyplot as plt
 from torch.utils.tensorboard import SummaryWriter
 from sklearn.metrics import precision_recall_fscore_support
 from sklearn.metrics import confusion_matrix
 from sklearn.metrics import accuracy_score
 from sklearn.metrics import classification_report
-from sklearn.utils.class_weight import compute_class_weight
 
 import warnings
 warnings.simplefilter(action='ignore', category=FutureWarning)
 warnings.simplefilter(action='ignore', category=UserWarning)
 torch.autograd.set_detect_anomaly(True)
-
 
 class OverallModel(nn.Module):
     def __init__(self, backbone, classifier, output_to_use, device):
@@ -35,19 +30,19 @@ class OverallModel(nn.Module):
     def loss_layers(self, training):
         if training:
             age_weight = torch.Tensor([2, 0.3373, 1.0606, 2])
-            backpack_weight = torch.Tensor([0.5, 2])
+            backpack_weight = torch.Tensor([0.6714, 1.9580])
             bag_weight = torch.Tensor([0.6779, 1.9047])
             clothes_weight = torch.Tensor([0.5773, 2])
             handbag_weight = torch.Tensor([0.5668, 2])
             hat_weight = torch.Tensor([0.5137, 2])
-            up_weight = torch.Tensor([0.525, 2])
-            down_colours_weight = torch.Tensor([0.2705, 0.7329, 1.0916,
+            up_weight = torch.Tensor([0.5253, 2])
+            down_colours_weight = torch.Tensor([0.2705, 0.7320, 1.0916,
                                    0.6222, 2, 2, 2, 1.3827, 2])
             up_colours_weight = torch.Tensor([0.7447, 1.75, 1, 1.4894, 2, 1.1667, 
                                     0.3608, 0.3608])
 
             loss_layers = nn.ModuleDict({'age': nn.CrossEntropyLoss(weight = age_weight),
-                                        'backpack': nn.BCELoss(),#weight = backpack_weight),
+                                        'backpack': nn.BCELoss(weight = backpack_weight),
                                         'bag': nn.BCELoss(),
                                         'clothes': nn.BCELoss(weight = clothes_weight),
                                         'down': nn.BCELoss(),
@@ -163,7 +158,6 @@ def metric_calculator(pred_and_true, classifier_params, epoch, device):
             precision, recall, _, _ = precision_recall_fscore_support(torch.flatten(real[attr].cpu(
             )), torch.round(torch.flatten(predictions[attr].cpu()).type(torch.float)), average='macro')
             metrics[attr] = {'precision': precision, 'recall': recall}
-    #print(metrics)
     return metrics
 
 
@@ -294,18 +288,13 @@ def training_loop(torch_ds, validation_ds, optimizer, device, model, classifier_
                 continue
             total_loss = sum([attr_loss for attr_loss in output.values()])
             for attr in output:
-                #    loss = loss + output[attr].item()
-                #print(f"Training: Attr: {attr} || Loss: {output[attr].item()}")
                 writer.add_scalar(f"{attr} Loss/train",
                                   output[attr].item(), step_counter)
-                # print(attr)
-            #print(f"Training: Overall Loss: {total_loss}")
             writer.add_scalar("Training Overall Loss",
                               total_loss, step_counter)
             total_loss.backward()
             optimizer.step()
             step_counter += 1
-        #print(step_counter)
         validation_loop(validation_ds, device, model, classifier_params, i)
         scheduler.step()
         model.train()

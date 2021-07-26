@@ -57,7 +57,15 @@ class MarketDataset(object):
     def image_loader(self, path):
         splits = path.split("\\")
         img_name = splits[len(splits) - 1]
-        return np.array(Image.open(path)), self.attribute_market.loc[self.attribute_market["image_index"] == img_name[:img_name.find("_")]]
+        img = Image.open(path)
+        img = np.array(img)
+        transform = A.Compose([
+            A.CLAHE(p = 0.5),
+            A.HorizontalFlip(p = 0.5)
+        ])
+        transformed_image = transform(image=img)['image']
+        transformed = Image.fromarray(transformed_image, 'RGB')
+        return transformed_image, self.attribute_market.loc[self.attribute_market["image_index"] == img_name[:img_name.find("_")]]
 
     def add_path(self, path, type):
         file_paths = []
@@ -125,7 +133,7 @@ class MarketDataset(object):
                 up_colours.append(int(attributes[col].item()))
                 # Since there are 9 attributes that contain "up" in it, but one of them is 
                 # just "up", which does not correspond to colours, we subtracted one to indicate completion.
-                if len(up_colours) == sum("up" in c for c in cols) - 1:
+                if len(up_colours) == 8:
                     if self.one_hot == True:
                         self.targets["up_colours"] = torch.tensor(up_colours)
                     else:
@@ -135,7 +143,7 @@ class MarketDataset(object):
                 down_colours.append(int(attributes[col].item()))
                 # Since there are 9 attributes that contain "down" in it, but one of them is 
                 # just "down", which does not correspond to colours, we subtracted one to indicate completion.
-                if len(down_colours) == sum("down" in c for c in cols) - 1:
+                if len(down_colours) == 9:
                     if self.one_hot == True:
                         self.targets["down_colours"] = torch.tensor(down_colours)
                     else:
