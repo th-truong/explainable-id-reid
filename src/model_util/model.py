@@ -206,6 +206,8 @@ class Classifier(nn.Module):
                 for layer in multi_layers_to_add:
                     if layer['type'] == 'linear':
                         if multi_linear_counter == 0:
+                            if backbone_output == "0":
+                                layer['kwargs']['in_features'] = 131072
                             if backbone_output == "1":
                                 layer['kwargs']['in_features'] = 32768
                             elif backbone_output == "2":
@@ -284,14 +286,14 @@ def training_loop(torch_ds, validation_ds, optimizer, device, model, classifier_
             images = torch.stack(images)
             images = images.to(device)
             _, output = model(images, targets)
-            if output == False:
-                continue
             total_loss = sum([attr_loss for attr_loss in output.values()])
+            print(total_loss)
             for attr in output:
                 writer.add_scalar(f"{attr} Loss/train",
                                   output[attr].item(), step_counter)
             writer.add_scalar("Training Overall Loss",
                               total_loss, step_counter)
+            print(total_loss.shape)
             total_loss.backward()
             optimizer.step()
             step_counter += 1
