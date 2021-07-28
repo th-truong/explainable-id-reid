@@ -42,6 +42,19 @@ hidden_layers_multi:
   - type: linear
     kwargs:
       in_features: 512
+      out_features: 256
+      bias: true
+  - type: relu_activation
+    kwargs:
+      inplace: false
+  - type: dropout
+    kwargs:
+      p: 0.5
+      inplace: true
+
+  - type: linear
+    kwargs:
+      in_features: 256
       out_features: 128
       bias: true
   - type: relu_activation
@@ -55,20 +68,7 @@ hidden_layers_multi:
   - type: linear
     kwargs:
       in_features: 128
-      out_features: 64
-      bias: true
-  - type: relu_activation
-    kwargs:
-      inplace: false
-  - type: dropout
-    kwargs:
-      p: 0.5
-      inplace: true
-
-  - type: linear
-    kwargs:
-      in_features: 64
-      out_features: 128
+      out_features: 256
       bias: true
   - type: relu_activation
     kwargs:
@@ -83,7 +83,7 @@ attribute_classification_layers:
     attribute: age
     activation: none
     kwargs:
-      in_features: 128
+      in_features: 256
       out_features: 4
       bias: true
 
@@ -123,7 +123,7 @@ attribute_classification_layers:
     attribute: down_colours
     activation: none
     kwargs:
-      in_features: 128
+      in_features: 256
       out_features: 9
       bias: true
 
@@ -171,7 +171,7 @@ attribute_classification_layers:
     attribute: up_colours
     activation: none
     kwargs:
-      in_features: 128
+      in_features: 256
       out_features: 8
       bias: true
 
@@ -202,7 +202,7 @@ backbone:
 
 backbone_output_to_use: pool
 
-epochs: 10
+epochs: 100
 
 optimizer:
   kwargs:

@@ -180,6 +180,8 @@ class Classifier(nn.Module):
                 for layer in binary_layers_to_add:
                     if layer['type'] == 'linear':
                         if binary_linear_counter == 0:
+                            if backbone_output == "0":
+                                layer['kwargs']['in_features'] = 131072
                             if backbone_output == "1":
                                 layer['kwargs']['in_features'] = 32768
                             elif backbone_output == "2":
@@ -248,7 +250,7 @@ def collate_fn(batch):
     return tuple(zip(*batch))
 
 
-def validation_loop(validation_ds, device, model, classifier_params, epoch):
+def validation_loop(validation_ds, testing, device, model, classifier_params, epoch):
     predictions_and_real = []
     model.eval()
     with torch.no_grad():
@@ -270,8 +272,11 @@ def validation_loop(validation_ds, device, model, classifier_params, epoch):
             predictions_and_real, classifier_params, epoch, device)
         for attr in metrics:
             for metric in metrics[attr]:
-                writer.add_scalar(f"{attr} {metric}",
-                                  metrics[attr][metric], epoch)
+                if not testing:
+                    writer.add_scalar(f"{attr} {metric}",
+                                    metrics[attr][metric], epoch)
+                else:
+                    print(f"{attr} {metric}: {metrics[attr][metric]}")
 
 
 def training_loop(torch_ds, validation_ds, optimizer, device, model, classifier_params, scheduler, epochs=20):
@@ -287,17 +292,15 @@ def training_loop(torch_ds, validation_ds, optimizer, device, model, classifier_
             images = images.to(device)
             _, output = model(images, targets)
             total_loss = sum([attr_loss for attr_loss in output.values()])
-            print(total_loss)
             for attr in output:
                 writer.add_scalar(f"{attr} Loss/train",
                                   output[attr].item(), step_counter)
             writer.add_scalar("Training Overall Loss",
                               total_loss, step_counter)
-            print(total_loss.shape)
             total_loss.backward()
             optimizer.step()
             step_counter += 1
-        validation_loop(validation_ds, device, model, classifier_params, i)
+        validation_loop(validation_ds, False, device, model, classifier_params, i)
         scheduler.step()
         model.train()
         torch.save({'model': model.state_dict(),
