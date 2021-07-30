@@ -141,8 +141,10 @@ def metric_calculator(pred_and_true, classifier_params, epoch, device):
             conf = confusion_matrix(torch.flatten(real[attr].cpu()), torch.round(
                 torch.flatten(predictions[attr].cpu()).type(torch.float)))
             tn, fp, fn, tp = conf.ravel()
+            print(conf)
+            print(tn, fp, fn,tp)
             precision, recall, _, _ = precision_recall_fscore_support(torch.flatten(real[attr].cpu(
-            )), torch.round(torch.flatten(predictions[attr].cpu()).type(torch.float)), average='macro')
+            )), torch.round(torch.flatten(predictions[attr].cpu()).type(torch.float)), average='binary')
             accuracy = accuracy_score(torch.flatten(real[attr].cpu()), torch.round(
                 torch.flatten(predictions[attr].cpu()).type(torch.float)))
             metrics[attr] = {'precision': precision, 'recall': recall, 'accuracy': accuracy,
@@ -158,6 +160,7 @@ def metric_calculator(pred_and_true, classifier_params, epoch, device):
             precision, recall, _, _ = precision_recall_fscore_support(torch.flatten(real[attr].cpu(
             )), torch.round(torch.flatten(predictions[attr].cpu()).type(torch.float)), average='macro')
             metrics[attr] = {'precision': precision, 'recall': recall}
+    print(metrics)
     return metrics
 
 
