@@ -79,7 +79,7 @@ class MarketDataset(object):
         for idx in indexes_to_skip:
             row = self.attribute_market.loc[self.attribute_market["image_index"] == idx].index
             self.attribute_market.drop(row, inplace = True)
-        for file in os.listdir(path):
+        for file in sorted(os.listdir(path)):
             if type == 0:
                 if file[-4:] == ".jpg":
                     if file[0:4] in indexes_to_skip:
