@@ -258,6 +258,7 @@ def collate_fn(batch):
 def validation_loop(validation_ds, testing, device, model, classifier_params, data_frame, epoch):
     predictions_and_real = []
     model.eval()
+    predicted_identities = []
     with torch.no_grad():
         for data in tqdm(iter(validation_ds)):
             inputs, labels = data
@@ -272,7 +273,8 @@ def validation_loop(validation_ds, testing, device, model, classifier_params, da
             images = torch.stack(images)
             images = images.to(device)
             output, _ = model(images, targets)
-            print(identity_matcher(output, data_frame))
+            if data_frame is not None:
+                predicted_identities.append(identity_matcher(output, data_frame))
             predictions_and_real.append((output, target_attrs))
         metrics = metric_calculator(
             predictions_and_real, classifier_params, epoch, device)
@@ -283,6 +285,8 @@ def validation_loop(validation_ds, testing, device, model, classifier_params, da
                                     metrics[attr][metric], epoch)
                 else:
                     print(f"{attr} {metric}: {round(metrics[attr][metric], 4)}")
+    if testing:
+        return predicted_identities
 
 
 def training_loop(torch_ds, validation_ds, optimizer, device, model, classifier_params, scheduler, epochs=20):
@@ -306,7 +310,7 @@ def training_loop(torch_ds, validation_ds, optimizer, device, model, classifier_
             total_loss.backward()
             optimizer.step()
             step_counter += 1
-        validation_loop(validation_ds, False, device, model, classifier_params, i)
+        validation_loop(validation_ds, False, device, model, classifier_params, None, i)
         scheduler.step()
         model.train()
         torch.save({'model': model.state_dict(),

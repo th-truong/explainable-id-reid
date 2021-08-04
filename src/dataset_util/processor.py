@@ -79,6 +79,7 @@ class MarketDataset(object):
         for idx in indexes_to_skip:
             row = self.attribute_market.loc[self.attribute_market["image_index"] == idx].index
             self.attribute_market.drop(row, inplace = True)
+        self.identities = []
         for file in sorted(os.listdir(path)):
             if type == 0:
                 if file[-4:] == ".jpg":
@@ -95,6 +96,7 @@ class MarketDataset(object):
                     elif self.mode == 2:
                         if file[0:2] != "-1" and file[0:4] != "0000":
                             file_paths.append(os.path.join(path, file))
+                            self.identities.append(file[0:4])
             elif type == 1:
                 if file[-4:] == ".mat":
                     file_paths.append(os.path.join(path, file))
