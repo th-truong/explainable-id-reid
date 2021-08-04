@@ -8,6 +8,7 @@ import torch.nn as nn
 import torch.optim as optim
 from tqdm import tqdm
 import torch
+import pandas as pd
 from torch.utils.tensorboard import SummaryWriter
 from sklearn.metrics import precision_recall_fscore_support
 from sklearn.metrics import confusion_matrix
@@ -135,14 +136,11 @@ def metric_calculator(pred_and_true, classifier_params, epoch, device):
 
     for attr in real:
         real[attr] = torch.stack(tuple(real[attr])).to(device)
-
     for attr in metrics:
         if attr != 'age' and attr != 'down_colours' and attr != 'up_colours':
             conf = confusion_matrix(torch.flatten(real[attr].cpu()), torch.round(
                 torch.flatten(predictions[attr].cpu()).type(torch.float)))
             tn, fp, fn, tp = conf.ravel()
-            print(conf)
-            print(tn, fp, fn,tp)
             precision, recall, _, _ = precision_recall_fscore_support(torch.flatten(real[attr].cpu(
             )), torch.round(torch.flatten(predictions[attr].cpu()).type(torch.float)), average='binary')
             accuracy = accuracy_score(torch.flatten(real[attr].cpu()), torch.round(
@@ -150,17 +148,21 @@ def metric_calculator(pred_and_true, classifier_params, epoch, device):
             metrics[attr] = {'precision': precision, 'recall': recall, 'accuracy': accuracy,
                              'sensitivity': tp/(tp + fn), 'specificity': tn/(tn + fp)}
         else:
+            labels = []
+            if attr == 'age':
+                labels = [0,1,2,3]
+            elif attr == 'up_colours':
+                labels = [0,1,2,3,4,5,6,7]
+            elif attr == 'down_colours':
+                labels = [0,1,2,3,4,5,6,7,8]
             conf = confusion_matrix(torch.flatten(real[attr].cpu()), torch.round(
-                torch.flatten(predictions[attr].cpu()).type(torch.float)))
-            print(f"\nEPOCH: {epoch}")
+                torch.flatten(predictions[attr].cpu()).type(torch.float)), labels = labels)
             print(conf)
             print(classification_report(torch.flatten(real[attr].cpu()), torch.round(
-                torch.flatten(predictions[attr].cpu()).type(torch.float)), digits=3))
-            print("\n")
+                torch.flatten(predictions[attr].cpu()).type(torch.float)), labels = labels, digits=3))
             precision, recall, _, _ = precision_recall_fscore_support(torch.flatten(real[attr].cpu(
             )), torch.round(torch.flatten(predictions[attr].cpu()).type(torch.float)), average='macro')
             metrics[attr] = {'precision': precision, 'recall': recall}
-    print(metrics)
     return metrics
 
 
@@ -253,7 +255,7 @@ def collate_fn(batch):
     return tuple(zip(*batch))
 
 
-def validation_loop(validation_ds, testing, device, model, classifier_params, epoch):
+def validation_loop(validation_ds, testing, device, model, classifier_params, data_frame, epoch):
     predictions_and_real = []
     model.eval()
     with torch.no_grad():
@@ -270,6 +272,7 @@ def validation_loop(validation_ds, testing, device, model, classifier_params, ep
             images = torch.stack(images)
             images = images.to(device)
             output, _ = model(images, targets)
+            print(identity_matcher(output, data_frame))
             predictions_and_real.append((output, target_attrs))
         metrics = metric_calculator(
             predictions_and_real, classifier_params, epoch, device)
@@ -279,7 +282,7 @@ def validation_loop(validation_ds, testing, device, model, classifier_params, ep
                     writer.add_scalar(f"{attr} {metric}",
                                     metrics[attr][metric], epoch)
                 else:
-                    print(f"{attr} {metric}: {metrics[attr][metric]}")
+                    print(f"{attr} {metric}: {round(metrics[attr][metric], 4)}")
 
 
 def training_loop(torch_ds, validation_ds, optimizer, device, model, classifier_params, scheduler, epochs=20):
@@ -311,6 +314,51 @@ def training_loop(torch_ds, validation_ds, optimizer, device, model, classifier_
                     }, str(i).zfill(3) + "resnet50_fpn_frcnn_full.tar")
     writer.flush()
     writer.close()
+
+
+def identity_matcher(attribute_predictions, data_frame):
+    dict_new = {}
+    for attr in list(attribute_predictions.keys()):
+        if attr == 'age' or attr == 'down_colours' or attr == 'up_colours':
+            if attr == 'age':
+                dict_new[attr] = [int(torch.argmax(attribute_predictions[attr]).cpu().item()) + 1]
+            else:
+                dict_new[attr] = [int(torch.argmax(attribute_predictions[attr]).cpu().item())]
+        else:
+            dict_new[attr] = [int(torch.round(attribute_predictions[attr]).cpu().item())]
+
+    down_colours = ['downblack', 'downblue', 'downbrown', 'downgray', 'downgreen', 'downpink', 'downpurple', 'downwhite', 'downyellow']
+    up_colours = ['upblack', 'upblue', 'upgray', 'upgreen', 'uppurple', 'upred', 'upwhite', 'upyellow']
+    for attr in list(dict_new.keys()):
+        if attr == 'down_colours':
+                down_col = dict_new[attr][0]
+                key = down_colours[down_col]
+                dict_new[key] = [1]
+                for col in down_colours:
+                        if col != key:
+                                dict_new[col] = [0]
+                del dict_new[attr]
+        if attr == 'up_colours':
+                up_col = dict_new[attr][0]
+                key = up_colours[up_col]
+                dict_new[key] = [1]
+                for col in up_colours:
+                        if col != key:
+                                dict_new[col] = [0]
+                del dict_new[attr]
+    dict_attr = {}
+    for attr in sorted(list(dict_new.keys())):
+        dict_attr[attr] = dict_new[attr]
+    row_attr = pd.DataFrame.from_dict(dict_attr)
+    row_matches = []
+    for idx, row in data_frame.iterrows():  
+        attribute_matches = 0
+        for col in row_attr.columns:
+                if int(row[col]) == int(row_attr[col]):
+                        attribute_matches += 1
+        if attribute_matches == len(list(row_attr.columns)):
+                row_matches.append(row['image_index'][0])
+    return row_matches
 
 
 if __name__ == "__main__":
