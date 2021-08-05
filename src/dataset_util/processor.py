@@ -9,6 +9,8 @@ import sys
 import confuse
 from pathlib import Path
 from torchvision.transforms import functional as F
+import traceback
+import albumentations as A
 
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 config = confuse.Configuration('market1501', __name__)
@@ -60,7 +62,15 @@ class MarketDataset(object):
     def image_loader(self, path):
         splits = path.split("\\")
         img_name = splits[len(splits) - 1]
-        return np.array(Image.open(path)), self.attribute_market.loc[self.attribute_market["image_index"] == img_name[:img_name.find("_")]]
+        img = Image.open(path)
+        img = np.array(img)
+        transform = A.Compose([
+            A.CLAHE(p=0.5),
+            A.HorizontalFlip(p=0.5)
+        ])
+        transformed_image = transform(image=img)['image']
+        transformed = Image.fromarray(transformed_image, 'RGB')
+        return transformed_image, self.attribute_market.loc[self.attribute_market["image_index"] == img_name[:img_name.find("_")]]
 
     def add_path(self, path, type):
         file_paths = []
@@ -71,11 +81,11 @@ class MarketDataset(object):
             if row[1]['downblack'] == 0 and row[1]['downwhite'] == 0 and row[1]['downpink'] == 0 and row[1]['downpurple'] == 0 and row[1]['downyellow'] == 0 and row[1]['downgray'] == 0 and row[1]['downblue'] == 0 and row[1]['downgreen'] == 0 and row[1]['downbrown'] == 0:
                 if row[1]['image_index'][0] not in indexes_to_skip:
                     indexes_to_skip.append(row[1]['image_index'][0])
-        self.identities = []
         for idx in indexes_to_skip:
             row = self.attribute_market.loc[self.attribute_market["image_index"] == idx].index
             self.attribute_market.drop(row, inplace=True)
-        for file in os.listdir(path):
+        self.identities = []
+        for file in sorted(os.listdir(path)):
             if type == 0:
                 if file[-4:] == ".jpg":
                     if file[0:4] in indexes_to_skip:
@@ -85,16 +95,13 @@ class MarketDataset(object):
                     if self.mode == 0:
                         if int(file[0:4]) > 199:
                             file_paths.append(os.path.join(path, file))
-                            if int(file[0:4]) not in self.identities:
-                                self.identities.append(int(file[0:4]))
                     elif self.mode == 1:
                         if int(file[0:4]) <= 199:
                             file_paths.append(os.path.join(path, file))
-                            if int(file[0:4]) not in self.identities:
-                                self.identities.append(int(file[0:4]))
                     elif self.mode == 2:
                         if file[0:2] != "-1" and file[0:4] != "0000":
                             file_paths.append(os.path.join(path, file))
+                            self.identities.append(file[0:4])
             elif type == 1:
                 if file[-4:] == ".mat":
                     file_paths.append(os.path.join(path, file))
@@ -134,7 +141,7 @@ class MarketDataset(object):
                 up_colours.append(int(attributes[col].item()))
                 # Since there are 9 attributes that contain "up" in it, but one of them is
                 # just "up", which does not correspond to colours, we subtracted one to indicate completion.
-                if len(up_colours) == sum("up" in c for c in cols) - 1:
+                if len(up_colours) == 8:
                     if self.one_hot == True:
                         self.targets["up_colours"] = torch.tensor(up_colours)
                     else:
@@ -145,7 +152,7 @@ class MarketDataset(object):
                 down_colours.append(int(attributes[col].item()))
                 # Since there are 9 attributes that contain "down" in it, but one of them is
                 # just "down", which does not correspond to colours, we subtracted one to indicate completion.
-                if len(down_colours) == sum("down" in c for c in cols) - 1:
+                if len(down_colours) == 9:
                     if self.one_hot == True:
                         self.targets["down_colours"] = torch.tensor(
                             down_colours)
