@@ -162,7 +162,10 @@ def metric_calculator(pred_and_true, classifier_params, epoch, device):
                 torch.flatten(predictions[attr].cpu()).type(torch.float)), labels = labels, digits=3))
             precision, recall, _, _ = precision_recall_fscore_support(torch.flatten(real[attr].cpu(
             )), torch.round(torch.flatten(predictions[attr].cpu()).type(torch.float)), average='macro')
-            metrics[attr] = {'precision': precision, 'recall': recall}
+            accuracy = accuracy_score(torch.flatten(real[attr].cpu(
+            )), torch.round(torch.flatten(predictions[attr].cpu()).type(torch.float)))
+            metrics[attr] = {'accuracy': accuracy, 'precision': precision, 'recall': recall}
+    print(metrics)
     return metrics
 
 
@@ -237,7 +240,6 @@ class Classifier(nn.Module):
                         if layer['activation'] == 'sigmoid':
                             layers.append(nn.Sigmoid())
                 self.model_layers[attr] = nn.Sequential(*layers)
-        print(self.model_layers)
             
     def forward(self, backbone_output):
         x = backbone_output
