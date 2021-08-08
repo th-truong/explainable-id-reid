@@ -165,7 +165,6 @@ def metric_calculator(pred_and_true, classifier_params, epoch, device):
             accuracy = accuracy_score(torch.flatten(real[attr].cpu(
             )), torch.round(torch.flatten(predictions[attr].cpu()).type(torch.float)))
             metrics[attr] = {'accuracy': accuracy, 'precision': precision, 'recall': recall}
-    print(metrics)
     return metrics
 
 
@@ -261,9 +260,11 @@ def validation_loop(validation_ds, testing, device, model, classifier_params, da
     predictions_and_real = []
     model.eval()
     predicted_identities = []
+    real_identities = []
     with torch.no_grad():
         for data in tqdm(iter(validation_ds)):
-            inputs, labels = data
+            inputs, labels, image_index = data
+            real_identities.append(image_index)
             images = list(image.to(device) for image in inputs)
             targets = [{k: v.to(device) for k, v in t.items()} for t in labels]
             target_attrs = {}
@@ -288,7 +289,7 @@ def validation_loop(validation_ds, testing, device, model, classifier_params, da
                 else:
                     print(f"{attr} {metric}: {round(metrics[attr][metric], 4)}")
     if testing:
-        return predicted_identities
+        return predicted_identities, real_identities
 
 
 def training_loop(torch_ds, validation_ds, optimizer, device, model, classifier_params, scheduler, epochs=20):
@@ -296,7 +297,7 @@ def training_loop(torch_ds, validation_ds, optimizer, device, model, classifier_
     for i in range(epochs):
         for data in tqdm(iter(torch_ds)):
             # get the inputs; data is a list of [inputs, labels]
-            inputs, labels = data
+            inputs, labels, _ = data
             optimizer.zero_grad()
             images = list(image.to(device) for image in inputs)
             targets = [{k: v.to(device) for k, v in t.items()} for t in labels]
@@ -360,10 +361,10 @@ def identity_matcher(attribute_predictions, data_frame):
     for idx, row in data_frame.iterrows():  
         attribute_matches = 0
         for col in row_attr.columns:
-                if int(row[col]) == int(row_attr[col]):
-                        attribute_matches += 1
-        if attribute_matches == len(list(row_attr.columns)):
-                row_matches.append(row['image_index'][0])
+            if int(row[col]) == int(row_attr[col]):
+                    attribute_matches += 1
+        if attribute_matches >= len(list(row_attr.columns)):
+                row_matches.append(int(row['image_index'][0]))
     return row_matches
 
 
