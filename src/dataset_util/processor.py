@@ -9,16 +9,16 @@ import sys
 import confuse
 from pathlib import Path
 from torchvision.transforms import functional as F
+import albumentations as A
 
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
-
 
 class MarketDataset(object):
     # the modes are:
     # 0 - train
     # 1 - validate
     # 2 - test
-    def __init__(self, root_path, image, mode, one_hot_encoded, attributes_to_use):
+    def __init__(self, config, root_path, image, mode, one_hot_encoded, attributes_to_use):
         self.paths = []
         self.mode = mode
         self.root_path = root_path
@@ -108,7 +108,7 @@ class MarketDataset(object):
         # Always sorted alphabetically
         cols = []
         for col in sorted(list(attributes.columns)):
-            if col in self.attributes_to_use:
+            if col in self.attributes_to_use or col == 'image_index':
                 cols.append(col)
             if "down_colours" in self.attributes_to_use and "down" in col and col != "down":
                 cols.append(col)
@@ -118,11 +118,12 @@ class MarketDataset(object):
         up_colours = []
         # Index positions: [downblack, downblue, downbrown, downgray, downgreen, downpink, downpurple, downwhite, downyellow]
         down_colours = []
+        image_index = 0
         for col in cols:
             # No need to include image_index
             if col == "image_index":
-                continue
-            if col == "age":
+                image_index = attributes[col].item()[0]
+            elif col == "age":
                 # Creating a one-hot encoded for age
                 if self.one_hot == True:
                     age_list = [0] * 4
@@ -154,11 +155,11 @@ class MarketDataset(object):
             else:
                 self.targets[col] = torch.tensor(int(attributes[col].item()))
         img = F.to_tensor(img)
-        return (img, self.targets)
+        return (img, self.targets, image_index)
 
     def view_sample(self, idx):
-        img, attr_map = self.__getitem__(idx)
-        return (img, attr_map)
+        img, attr_map, image_index = self.__getitem__(idx)
+        return (img, attr_map, image_index)
 
 if __name__ == "__main__":
     config = confuse.Configuration('market1501', __name__)
