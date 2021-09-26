@@ -84,4 +84,4 @@ if __name__ == "__main__":
             else: 
                 false += 1
         
-        print(f"Rank {rank} matching on the specified models is: {round((true/(true+false)), 2)}% ({true} true matches and {false} false matches).")
+        print(f"Rank {rank} matching on the specified models is: {(round((true/(true+false)), 4)) * 100}% ({true} true matches and {false} false matches).")
