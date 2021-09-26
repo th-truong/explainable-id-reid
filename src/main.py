@@ -3,9 +3,9 @@ import torch
 import confuse
 from pathlib import Path
 from dataset_util.processor import MarketDataset
-from model_util.model2 import OverallModel
-from model_util.model2 import Classifier
-from model_util.model2 import collate_fn
+from model_util.model import OverallModel
+from model_util.model import Classifier
+from model_util.model import collate_fn
 from training_util.train_and_valid import validation_loop
 from training_util.train_and_valid import training_loop
 from training_util.train_and_valid import metric_calculator
