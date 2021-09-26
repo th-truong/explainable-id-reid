@@ -10,7 +10,7 @@ from tqdm import tqdm
 import torch
 import pandas as pd
 from torch.utils.tensorboard import SummaryWriter
-from model_util.model2 import OverallModel
+from model_util.model import OverallModel
 import os
 import sys
 sys.path.append(os.getcwd() + "/model_util")
