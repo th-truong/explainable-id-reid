@@ -23,7 +23,7 @@ class OverallModel(nn.Module):
         self.classifier = classifier
         self.output_to_use = output_to_use
         self.device = device
-
+ #adding waits for training layer to conteract the data imbalance
     def loss_layers(self, training):
         if training:
             age_weight = torch.Tensor([2, 0.3373, 1.0606, 2])
@@ -37,7 +37,7 @@ class OverallModel(nn.Module):
                                    0.6222, 2, 2, 2, 1.3827, 2])
             up_colours_weight = torch.Tensor([0.7447, 1.75, 1, 1.4894, 2, 1.1667, 
                                     0.3608, 0.3608])
-
+#applying cross entropy lose function
             loss_layers = nn.ModuleDict({'age': nn.CrossEntropyLoss(weight = age_weight),
                                         'backpack': nn.BCELoss(weight = backpack_weight),
                                         'bag': nn.BCELoss(),
@@ -116,6 +116,7 @@ class Classifier(nn.Module):
         layers_to_use = classifier_params["attributes_to_use"]
         self.device = device
         self.model_layers = nn.ModuleDict()
+        #applying layers loop
         for attr in layers_to_use:
             binary_linear_counter = 0
             multi_linear_counter = 0
@@ -197,7 +198,7 @@ if __name__ == "__main__":
     writer = SummaryWriter()
     device = torch.device(
         'cuda') if torch.cuda.is_available() else torch.device('cpu')
-
+#add correct paths to classifer_architecture.yml file
     config = confuse.Configuration('market1501', __name__)
     config.set_file(Path(
         r"C:\\Users\\Div\\Desktop\\Research\\reid\\reid\\explainable-id-reid\\src\\dataset_util\\market1501.yml"))

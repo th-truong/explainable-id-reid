@@ -36,7 +36,8 @@ class MarketDataset(object):
 
     def __len__(self):
         return len(self.paths)
-
+    
+    #loading mat files, based on mode; train or test
     def load_mats(self, file_name, mode):
         mat = loadmat(file_name)
         if mode == 0 or mode == 1:
@@ -163,6 +164,7 @@ class MarketDataset(object):
 
 if __name__ == "__main__":
     config = confuse.Configuration('market1501', __name__)
+    #adding yaml path to the market1501.yml file, based on local file location
     config.set_file(Path(r"C:\\Users\\Div\\Desktop\\Research\\reid\\reid\\explainable-id-reid\\src\\dataset_util\\market1501.yml"))
     test_obj = MarketDataset(
         config['market_1501_ds']['test_path'].get(), True, 2, False)

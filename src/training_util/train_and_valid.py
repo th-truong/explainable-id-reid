@@ -15,6 +15,7 @@ import os
 import sys
 sys.path.append(os.getcwd() + "/model_util")
 
+#metric calculator for each prediction
 def metric_calculator(pred_and_true, classifier_params, epoch, device):
     metrics = {}
     predictions = {}

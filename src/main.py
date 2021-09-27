@@ -1,3 +1,4 @@
+#adding all the imports
 import argparse
 import torch
 import confuse
@@ -83,5 +84,5 @@ if __name__ == "__main__":
                 true += 1
             else: 
                 false += 1
-        
+        #Printing ranks 
         print(f"Rank {rank} matching on the specified models is: {(round((true/(true+false)), 4)) * 100}% ({true} true matches and {false} false matches).")
