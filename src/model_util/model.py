@@ -11,6 +11,7 @@ import torch
 import pandas as pd
 from torch.utils.tensorboard import SummaryWriter
 
+# Ignore warning on runtime
 import warnings
 warnings.simplefilter(action='ignore', category=FutureWarning)
 warnings.simplefilter(action='ignore', category=UserWarning)
@@ -23,7 +24,7 @@ class OverallModel(nn.Module):
         self.classifier = classifier
         self.output_to_use = output_to_use
         self.device = device
- #adding waits for training layer to conteract the data imbalance
+    # Adding weights to each unbalanced attribute to conteract the data imbalances
     def loss_layers(self, training):
         if training:
             age_weight = torch.Tensor([2, 0.3373, 1.0606, 2])
@@ -37,7 +38,7 @@ class OverallModel(nn.Module):
                                    0.6222, 2, 2, 2, 1.3827, 2])
             up_colours_weight = torch.Tensor([0.7447, 1.75, 1, 1.4894, 2, 1.1667, 
                                     0.3608, 0.3608])
-#applying cross entropy lose function
+            # Creating a map for each attribute with the corresponding loss layer and weights.
             loss_layers = nn.ModuleDict({'age': nn.CrossEntropyLoss(weight = age_weight),
                                         'backpack': nn.BCELoss(weight = backpack_weight),
                                         'bag': nn.BCELoss(),
@@ -51,18 +52,20 @@ class OverallModel(nn.Module):
                                         'up': nn.BCELoss(weight = up_weight),
                                         'up_colours': nn.CrossEntropyLoss(weight = up_colours_weight)})
         
-        loss_layers = nn.ModuleDict({'age': nn.CrossEntropyLoss(),
-                                        'backpack': nn.BCELoss(),
-                                        'bag': nn.BCELoss(),
-                                        'clothes': nn.BCELoss(),
-                                        'down': nn.BCELoss(),
-                                        'down_colours': nn.CrossEntropyLoss(),
-                                        'gender': nn.BCELoss(),
-                                        'hair': nn.BCELoss(),
-                                        'handbag': nn.BCELoss(),
-                                        'hat': nn.BCELoss(),
-                                        'up': nn.BCELoss(),
-                                        'up_colours': nn.CrossEntropyLoss()})
+        # Not applying weights when testing.
+        else:
+            loss_layers = nn.ModuleDict({'age': nn.CrossEntropyLoss(),
+                                            'backpack': nn.BCELoss(),
+                                            'bag': nn.BCELoss(),
+                                            'clothes': nn.BCELoss(),
+                                            'down': nn.BCELoss(),
+                                            'down_colours': nn.CrossEntropyLoss(),
+                                            'gender': nn.BCELoss(),
+                                            'hair': nn.BCELoss(),
+                                            'handbag': nn.BCELoss(),
+                                            'hat': nn.BCELoss(),
+                                            'up': nn.BCELoss(),
+                                            'up_colours': nn.CrossEntropyLoss()})
         return loss_layers
 
     def forward(self, input, targets):
@@ -106,8 +109,6 @@ class OverallModel(nn.Module):
         return output, output_dict
 
 class Classifier(nn.Module):
-    # configurable, default activation layer is ReLU, but can be changed. Default setting for dropout
-    # is False (not included), but can do so
     def __init__(self, classifier_params, input, device):
         super(Classifier, self).__init__()
         binary_layers_to_add = classifier_params["hidden_layers_binary"]
@@ -189,71 +190,6 @@ class Classifier(nn.Module):
 
         return attribute_predictions
 
-
+# Groups together the batch input
 def collate_fn(batch):
     return tuple(zip(*batch))
-
-
-if __name__ == "__main__":
-    writer = SummaryWriter()
-    device = torch.device(
-        'cuda') if torch.cuda.is_available() else torch.device('cpu')
-#add correct paths to classifer_architecture.yml file
-    config = confuse.Configuration('market1501', __name__)
-    config.set_file(Path(
-        r"C:\\Users\\Div\\Desktop\\Research\\reid\\reid\\explainable-id-reid\\src\\dataset_util\\market1501.yml"))
-    cfg = confuse.Configuration('model_architecture', __name__, read=False)
-    cfg.set_file(
-        "C:\\Users\\Div\\Desktop\\Research\\reid\\reid\\explainable-id-reid\\src\\model_util\\classifier_architecture.yml")
-    architecture = cfg.get()
-
-    from processor import MarketDataset
-    test_obj = MarketDataset(
-        config['market_1501_ds']['test_path'].get(), True, 2, False, architecture['attributes_to_use'])
-    train_obj = MarketDataset(
-        config['market_1501_ds']['train_path'].get(), True, 0, False, architecture['attributes_to_use'])
-    validate_obj = MarketDataset(
-        config['market_1501_ds']['train_path'].get(), True, 1, False, architecture['attributes_to_use'])
-
-    torch_ds_test = torch.utils.data.DataLoader(test_obj,
-                                                batch_size=architecture['dataloader']['kwargs']['batch_size'],
-                                                num_workers=architecture['dataloader']['kwargs']['num_workers'],
-                                                collate_fn=collate_fn)
-    torch_ds_train = torch.utils.data.DataLoader(train_obj,
-                                                 batch_size=architecture['dataloader']['kwargs']['batch_size'],
-                                                 num_workers=architecture['dataloader']['kwargs']['num_workers'],
-                                                 collate_fn=collate_fn)
-    torch_ds_val = torch.utils.data.DataLoader(validate_obj,
-                                               batch_size=architecture['dataloader']['kwargs']['batch_size'],
-                                               num_workers=architecture['dataloader']['kwargs']['num_workers'],
-                                               collate_fn=collate_fn)
-
-    # Parameters for loop:
-    backbone = resnet_fpn_backbone(
-        **architecture['backbone']['kwargs'])
-    backbone = backbone.to(device)
-    # The second argument is the output being used as a String,
-    # "1", "2", "3", or "pool"
-    obj = Classifier(architecture, str(
-        architecture['backbone_output_to_use']), device)
-    model = OverallModel(backbone, obj, str(
-        architecture['backbone_output_to_use']), device)
-    # Freezing the FPN layers:
-    for k, v in model.named_parameters():
-        if "backbone.fpn" in str(k):
-            v.requires_grad = False
-    for k, v in model.named_parameters():
-        print('{}: {}'.format(k, v.requires_grad))
-    #print(list(model.modules()))
-
-    model = model.train()
-    optimizer = optim.Adam(obj.parameters(
-    ), lr=architecture['optimizer']['kwargs']['lr'])
-    model = model.to(device)
-    scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[
-                                                     architecture['scheduler']['kwargs']['milestones']], gamma=architecture['scheduler']['kwargs']['gamma'])
-    print(next(model.parameters()).device)
-    print("CUDA Availability: ", torch.cuda.is_available())
-    training_loop(torch_ds_train, torch_ds_val, optimizer, device, model,
-                  architecture['attributes_to_use'], scheduler, architecture['epochs'])
-    print('Finished Training')

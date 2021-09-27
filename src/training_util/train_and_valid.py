@@ -192,7 +192,7 @@ def training_loop(torch_ds, validation_ds, optimizer, device, model, classifier_
     step_counter = 0
     for i in range(epochs):
         for data in tqdm(iter(torch_ds)):
-            # get the inputs; data is a list of [inputs, labels]
+            # Get the inputs, labels, and the third return is unused in training_loop.
             inputs, labels, _ = data
             optimizer.zero_grad()
             images = list(image.to(device) for image in inputs)
