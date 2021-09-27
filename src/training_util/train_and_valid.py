@@ -117,7 +117,7 @@ def identity_matcher(attribute_predictions, data_frame, rank):
                 row_matches.append(int(row['image_index'][0]))
     return row_matches
 
-def validation_loop(validation_ds, need_to_write, device, backbone, objs, model_s, multiple, classifier_params, data_frame, rank, epoch):
+def validation_loop(validation_ds, need_to_write, device, backbone, objs, model_s, multiple, classifier_params, data_frame, rank, writer, epoch):
     predictions_and_real = []
     predicted_identities = []
     real_identities = []
@@ -159,39 +159,24 @@ def validation_loop(validation_ds, need_to_write, device, backbone, objs, model_
                 model.eval()
                 outputpool, _ = model(images, targets)
             else:
-                output_ovr = model_s(images, targets)
-            predictions = {}
-            for key in list(output0.keys()):
-                if key == 'age' or key == 'backpack' or key == 'clothes' or key == 'hair':
-                    if multiple == True:
+                output_ovr, _ = model_s(images, targets)
+            if not need_to_write:
+                predictions = {}
+                for key in list(output0[0].keys()):
+                    if key == 'age' or key == 'backpack' or key == 'clothes' or key == 'hair':
                         predictions[key] = output1[key]
-                    else: 
-                        predictions[key] = output_ovr[key]
-                elif key == 'down' or key == 'hat':
-                    if multiple == True:
+                    elif key == 'down' or key == 'hat':
                         predictions[key] = output2[key]
-                    else: 
-                        predictions[key] = output_ovr[key]
-                elif key == 'bag' or key == 'down_colours' or key == 'handbag' or key == 'up_colours':
-                    if multiple == True:
+                    elif key == 'bag' or key == 'down_colours' or key == 'handbag' or key == 'up_colours':
                         predictions[key] = output3[key]
-                    else: 
-                        predictions[key] = output_ovr[key]
-                elif key == 'up':
-                    if multiple == True:
+                    elif key == 'up':
                         predictions[key] = outputpool[key]
-                    else: 
-                        predictions[key] = output_ovr[key]
-                else:
-                    if multiple == True:
+                    else:
                         predictions[key] = output0[key]
-                    else: 
-                        predictions[key] = output_ovr[key]
-            
             if data_frame is not None:
                 predicted_identities.append(identity_matcher(predictions, data_frame, rank))
             if need_to_write:
-                predictions_and_real.append((predictions, target_attrs))
+                predictions_and_real.append((output_ovr, target_attrs))
         if need_to_write:
             metrics = metric_calculator(
                 predictions_and_real, classifier_params, epoch, device)
@@ -203,7 +188,7 @@ def validation_loop(validation_ds, need_to_write, device, backbone, objs, model_
         return predicted_identities, real_identities
 
 
-def training_loop(torch_ds, validation_ds, optimizer, device, model, classifier_params, scheduler, epochs=20):
+def training_loop(torch_ds, validation_ds, optimizer, device, model, classifier_params, scheduler, writer, epochs=20):
     step_counter = 0
     for i in range(epochs):
         for data in tqdm(iter(torch_ds)):
@@ -224,7 +209,7 @@ def training_loop(torch_ds, validation_ds, optimizer, device, model, classifier_
             total_loss.backward()
             optimizer.step()
             step_counter += 1
-        validation_loop(validation_ds, True, device, None, None, model, False, classifier_params, None, i)
+        validation_loop(validation_ds, True, device, None, None, model, False, classifier_params, None, 0, writer, i)
         scheduler.step()
         model.train()
         torch.save({'model': model.state_dict(),

@@ -94,7 +94,7 @@ class OverallModel(nn.Module):
                     for attr in output:
                         output[attr] = output[attr].type(torch.float32).to(self.device)
                     output_dict[attribute] = loss_layers[attribute](
-                        output[attribute], target_outputs[attribute].view(output[attribute].shape))/to(self.device)
+                        output[attribute], target_outputs[attribute].view(output[attribute].shape)).to(self.device)
                 else:
                     for attr in target_outputs:
                         target_outputs[attr] = target_outputs[attr].type(
@@ -116,7 +116,7 @@ class Classifier(nn.Module):
         layers_to_use = classifier_params["attributes_to_use"]
         self.device = device
         self.model_layers = nn.ModuleDict()
-        #applying layers loop
+        # Adding layers to model in a loop.
         for attr in layers_to_use:
             binary_linear_counter = 0
             multi_linear_counter = 0

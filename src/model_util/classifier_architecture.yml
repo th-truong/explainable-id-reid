@@ -191,7 +191,7 @@ attributes_to_use:
 
 dataloader:
   kwargs:
-    batch_size: 1
+    batch_size: 2
     num_workers: 4
 
 backbone:
