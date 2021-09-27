@@ -1,4 +1,4 @@
 market_1501_ds:
-  test_path: "C:\\Users\\Div\\Desktop\\Research\\reid\\reid\\Market-1501-v15.09.15\\Images\\query"
-  train_path: "C:\\Users\\Div\\Desktop\\Research\\reid\\reid\\Market-1501-v15.09.15\\Images\\bounding_box_train"
-  att_path: "C:\\Users\\Div\\Desktop\\Research\\reid\\reid\\Market-1501-v15.09.15\\Attributes\\market_attribute.mat"
+  test_path: "Enter path to testing dataset here for training (validation set) and query dataset path when testing."
+  train_path: "Enter path to training dataset here."
+  att_path: "Enter path to the market_attribute.mat attributes file here."

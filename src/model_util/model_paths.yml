@@ -1,6 +1,6 @@
 model_paths:
-  model_output0: "C:\\Users\\Div\\Desktop\\Research\\reid\\reid\\explainable-id-reid\\src\\model_util\\Backbone0\\099resnet50_fpn_frcnn_full.tar"
-  model_output1: "C:\\Users\\Div\\Desktop\\Research\\reid\\reid\\explainable-id-reid\\src\\model_util\\Backbone1\\099resnet50_fpn_frcnn_full.tar"
-  model_output2: "C:\\Users\\Div\\Desktop\\Research\\reid\\reid\\explainable-id-reid\\src\\model_util\\runsALLON2\\099resnet50_fpn_frcnn_full.tar"
-  model_output3: "C:\\Users\\Div\\Desktop\\Research\\reid\\reid\\explainable-id-reid\\src\\model_util\\Backbone3\\099resnet50_fpn_frcnn_full.tar"
-  model_outputpool: "C:\\Users\\Div\\Desktop\\Research\\reid\\reid\\explainable-id-reid\\src\\model_util\\runsALLONPOOL\\099resnet50_fpn_frcnn_full.tar"
+  model_output0: "Enter model trained using backbone output 0 here."
+  model_output1: "Enter model trained using backbone output 1 here."
+  model_output2: "Enter model trained using backbone output 2 here."
+  model_output3: "Enter model trained using backbone output 3 here."
+  model_outputpool: "Enter model trained using backbone output pool here."
