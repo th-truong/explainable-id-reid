@@ -13,6 +13,8 @@ import albumentations as A
 
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 
+# The MarketDataset creates an object of the attribute file as a panda dataframe as well as
+# the paths to the images used for training/validating/testing.
 class MarketDataset(object):
     # the modes are:
     # 0 - train
@@ -27,17 +29,18 @@ class MarketDataset(object):
             config['market_1501_ds']['att_path'].get(), mode)
         self.attributes_to_use = attributes_to_use
 
-        # The second parameter in add_path is 0 for images, 1 for .mat files
+        # The second parameter in add_path is 0 for images, 1 for .mat files.
         if image is True:
             self.paths = self.add_path(root_path, 0)
 
         else:
             self.paths = self.add_path(root_path, 1)
 
+    # Returns the length of the paths (the number of images).
     def __len__(self):
         return len(self.paths)
     
-    # Loading mat files, based on mode: train or test
+    # Loading mat files and putting them in a panda dataframe, based on mode: train or test.
     def load_mats(self, file_name, mode):
         mat = loadmat(file_name)
         if mode == 0 or mode == 1:
@@ -55,11 +58,13 @@ class MarketDataset(object):
                 df2[col] -= 1
         return df2
 
+    # Returning the read in the image as well as the image_index (the person identity number) for the image.
     def image_loader(self, path):
         splits = path.split("\\")
         img_name = splits[len(splits) - 1]
         img = Image.open(path)
         img = np.array(img)
+        # Applying tranformations on the image to offset the imbalanced attributes.
         transform = A.Compose([
             A.CLAHE(p = 0.5),
             A.HorizontalFlip(p = 0.5)
@@ -68,6 +73,8 @@ class MarketDataset(object):
         transformed = Image.fromarray(transformed_image, 'RGB')
         return transformed_image, self.attribute_market.loc[self.attribute_market["image_index"] == img_name[:img_name.find("_")]]
 
+    # Adds the full paths to the images, seperates the training set into training and validation based on 
+    # the person IDs.
     def add_path(self, path, type):
         file_paths = []
         indexes_to_skip = []
@@ -103,6 +110,7 @@ class MarketDataset(object):
                     file_paths.append(os.path.join(path, file))
         return file_paths
 
+    # Returns the image tensor, the attribute description dictionary, and the image_index.
     def __getitem__(self, idx):
         img, attributes = self.image_loader(self.paths[idx])
         self.targets = {}
@@ -158,6 +166,7 @@ class MarketDataset(object):
         img = F.to_tensor(img)
         return (img, self.targets, image_index)
 
+    # Calls getitem() and returns the values.
     def view_sample(self, idx):
         img, attr_map, image_index = self.__getitem__(idx)
         return (img, attr_map, image_index)

@@ -15,7 +15,9 @@ import os
 import sys
 sys.path.append(os.getcwd() + "/model_util")
 
-#metric calculator for each prediction
+# Metric calculator for each prediction, takes in a list of tuples of the predicted attributes
+# as well as the real attributes, the attributes we want to looks at, the epoch number, and the 
+# device whether it is CUDA or cpu.
 def metric_calculator(pred_and_true, classifier_params, epoch, device):
     metrics = {}
     predictions = {}
@@ -72,6 +74,8 @@ def metric_calculator(pred_and_true, classifier_params, epoch, device):
             metrics[attr] = {'accuracy': accuracy, 'precision': precision, 'recall': recall}
     return metrics
 
+# Returns a list of matched indexes with the rank specified. Takes in the dictionary of the 
+# predicted attributes, the pandas dataframe holding the real attributes, and the rank requested.
 def identity_matcher(attribute_predictions, data_frame, rank):
     dict_new = {}
     for attr in list(attribute_predictions.keys()):
@@ -117,6 +121,20 @@ def identity_matcher(attribute_predictions, data_frame, rank):
                 row_matches.append(int(row['image_index'][0]))
     return row_matches
 
+# The loop for validation, when testing, returns the real_identities in order, and the predicted
+# identities (list). Takes in:
+# the dataset used - validation_ds (validation dataset when training, and testing dataset when testing),
+# a boolean - need_to_write, which specifies the need to log metrics (True when training, False when testing),
+# the - device (CUDA or cpu), 
+# the - backbone (None when training), 
+# the MarketDataset objects list - objs (None when training),
+# the - model_s (a list of models when testing, a single model when training), 
+# a boolean - multiple (True when testing, False when training), 
+# the classifier_params, which contains which attribute we want to use when testing,
+# the - data_frame, contains the pandas dataframe of the true attributes (None when traing),
+# the - rank, rank of identity matches (0 when training),
+# the - writer, the TensorBoard writer to log metrics (None when testing),
+# the - epoch (0 when testing).
 def validation_loop(validation_ds, need_to_write, device, backbone, objs, model_s, multiple, classifier_params, data_frame, rank, writer, epoch):
     predictions_and_real = []
     predicted_identities = []
@@ -187,7 +205,17 @@ def validation_loop(validation_ds, need_to_write, device, backbone, objs, model_
     if not need_to_write:
         return predicted_identities, real_identities
 
-
+# The training loop.
+# Takes in:
+# the - torch_ds, which is the DataLoader used for training,
+# the - validation_ds, which is the validation set,
+# the - optimizer, which is the optimizer being used to change weights,
+# the - device (CUDA or cpu),
+# the - model,
+# the - classifier_params, which specifies which attributes to use,
+# the - scheduler, which changes the learning rate at a predefined number of epochs,
+# the - writer, the TensorBoard object which logs the metrics,
+# the - epochs, number of epochs in the training loop, set to a default value of 20.
 def training_loop(torch_ds, validation_ds, optimizer, device, model, classifier_params, scheduler, writer, epochs=20):
     step_counter = 0
     for i in range(epochs):

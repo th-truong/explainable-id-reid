@@ -17,6 +17,7 @@ warnings.simplefilter(action='ignore', category=FutureWarning)
 warnings.simplefilter(action='ignore', category=UserWarning)
 torch.autograd.set_detect_anomaly(True)
 
+# The overall model which contains the Classifier and the remaining classification layers.
 class OverallModel(nn.Module):
     def __init__(self, backbone, classifier, output_to_use, device):
         super(OverallModel, self).__init__()
@@ -68,6 +69,8 @@ class OverallModel(nn.Module):
                                             'up_colours': nn.CrossEntropyLoss()})
         return loss_layers
 
+    # Passes the input into the backbone, and then gets the output of the backbone
+    # and passes it into the classifier layers. It also generates the losses for each attribute.
     def forward(self, input, targets):
         back_out = self.backbone(input)
         backbone_out = back_out[self.output_to_use].to(self.device)
@@ -108,6 +111,7 @@ class OverallModel(nn.Module):
                         output[attribute], target_outputs[attribute]).to(self.device)
         return output, output_dict
 
+# Parsing the classifier_archiecture.yml file and adding the layers in it to the model's layers.
 class Classifier(nn.Module):
     def __init__(self, classifier_params, input, device):
         super(Classifier, self).__init__()
@@ -179,6 +183,8 @@ class Classifier(nn.Module):
                             layers.append(nn.Sigmoid())
                 self.model_layers[attr] = nn.Sequential(*layers).to(self.device)
             
+    # Takes in the backbone_output, flattens it, and applies the model layers to it and returns each prediction 
+    # for each attribute.
     def forward(self, backbone_output):
         x = backbone_output.to(self.device)
         x = torch.flatten(x, start_dim=1).to(self.device)
