@@ -1,0 +1,15 @@
+argparse
+torch
+confuse
+pathlib
+torchvision
+slearn.metrics
+numpy
+tqdm
+pandas
+os
+sys
+matplotlib
+albumentations
+scipy.io
+PIL
