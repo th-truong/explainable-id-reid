@@ -31,3 +31,6 @@ We have applied a ResNet-50/FPN backbone which provides five different output he
 * albumentations
 * scipy.io
 * PIL
+
+# How to Run
+To run, install all required libraries and download dataset and update path files in dataset_utils/market1501.yml and model_utils/model_paths.yml, as well as configure the parameters of training and testing in model_util/classifier_architecture.yml. Then, run 'python main.py' when in the src directory and follow the instructions on the terminal.
