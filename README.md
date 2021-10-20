@@ -14,3 +14,5 @@ compared to state-of-the-art models focused on re-identification.
 # Network Architecture
 We have applied a ResNet-50/FPN backbone which provides five different output heads, "0", "1", "2", "3", and "pool". Then, we feed in these outputs to a linear classification layer system, which provide attribute predictions for the probe image.
 ![Network Architecture](https://user-images.githubusercontent.com/58268240/138032890-6f8d315d-1d4a-46de-96f5-2fa7bca0c9b7.PNG)
+
+# L
