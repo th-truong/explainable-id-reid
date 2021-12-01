@@ -1,15 +1,15 @@
 argparse
 torch
-confuse
+confuse 1.5.0
 pathlib
-torchvision
-slearn.metrics
-numpy
-tqdm
-pandas
-os
+torchvision 0.10.0
+scikit-learn 0.24.2
+numpy 1.21.0
+tqdm 4.61.2
+pandas 1.2.5
+os 
 sys
-matplotlib
-albumentations
-scipy.io
-PIL
+matplotlib 3.3.4
+albumentations 1.0.3
+scipy.io 1.6.2
+pillow 8.3.1
